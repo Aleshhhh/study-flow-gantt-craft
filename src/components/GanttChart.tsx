@@ -59,7 +59,7 @@ export const GanttChart: React.FC = () => {
   const monthGroups = timeline.reduce((acc, date) => {
     const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
     if (!acc[monthKey]) {
-      acc[monthKey] = { month: monthNames[date.getMonth()], year: date.getFullYear(), count: 0 };
+      acc[monthKey] = { month: monthNames[date.getMonth()], year: date.getFullYear().toString(), count: 0 };
     }
     acc[monthKey].count++;
     return acc;
@@ -222,4 +222,30 @@ export const GanttChart: React.FC = () => {
       />
     </div>
   );
+
+  function handleTaskUpdate(taskId: string, updates: Partial<Task>) {
+    setTasks(prev => prev.map(task => 
+      task.id === taskId ? { ...task, ...updates } : task
+    ));
+  }
+
+  function handleTaskClick(task: Task) {
+    setSelectedTask(task);
+    setIsEditModalOpen(true);
+  }
+
+  function handleAddTask() {
+    const newTask: Task = {
+      id: Date.now().toString(),
+      title: 'New Task',
+      description: '',
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
+      color: '#6b7280',
+      milestones: []
+    };
+    setTasks(prev => [...prev, newTask]);
+    setSelectedTask(newTask);
+    setIsEditModalOpen(true);
+  }
 };
