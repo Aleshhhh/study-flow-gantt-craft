@@ -7,6 +7,8 @@ interface TaskBarProps {
   task: Task;
   timeline: Date[];
   yPosition: number;
+  dayWidth: number;
+  scrollOffset: number;
   onUpdate: (updates: Partial<Task>) => void;
   onClick: () => void;
 }
@@ -15,6 +17,8 @@ export const TaskBar: React.FC<TaskBarProps> = ({
   task, 
   timeline, 
   yPosition, 
+  dayWidth,
+  scrollOffset,
   onUpdate, 
   onClick 
 }) => {
@@ -25,8 +29,6 @@ export const TaskBar: React.FC<TaskBarProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, startDate: new Date() });
   const barRef = useRef<HTMLDivElement>(null);
 
-  const dayWidth = 60;
-
   // Calculate task position and width
   const getTaskPosition = () => {
     const startIndex = timeline.findIndex(date => 
@@ -36,7 +38,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
       date.toDateString() === task.endDate.toDateString()
     );
     
-    const left = Math.max(0, startIndex * dayWidth);
+    const left = Math.max(0, startIndex * dayWidth) - scrollOffset;
     const width = Math.max(dayWidth, (endIndex - startIndex + 1) * dayWidth);
     
     return { left, width };
@@ -136,7 +138,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
     <>
       <div
         ref={barRef}
-        className="absolute rounded-xl shadow-sm border transition-all duration-300 hover:shadow-lg cursor-pointer group"
+        className="absolute rounded-lg shadow-sm border transition-all duration-300 hover:shadow-lg cursor-pointer group"
         style={{
           left: `${left}px`,
           top: `${yPosition}px`,
@@ -177,13 +179,13 @@ export const TaskBar: React.FC<TaskBarProps> = ({
           
           {/* Left resize handle */}
           <div 
-            className="absolute left-0 top-0 w-2 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-auto rounded-l-xl"
+            className="absolute left-0 top-0 w-2 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-auto rounded-l-lg"
             onMouseDown={handleLeftResizeMouseDown}
           />
           
           {/* Right resize handle */}
           <div 
-            className="absolute right-0 top-0 w-2 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-auto rounded-r-xl"
+            className="absolute right-0 top-0 w-2 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-auto rounded-r-lg"
             onMouseDown={handleRightResizeMouseDown}
           />
         </div>
@@ -192,7 +194,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
       {/* Expanded description */}
       {isExpanded && task.description && (
         <div
-          className="absolute bg-card border border-border rounded-xl shadow-lg p-4 max-w-md z-20 transition-all duration-300 animate-in slide-in-from-top-2"
+          className="absolute bg-card border border-border rounded-lg shadow-xl p-4 max-w-md z-20 transition-all duration-300 animate-in slide-in-from-top-2"
           style={{
             left: `${left}px`,
             top: `${yPosition + 50}px`,

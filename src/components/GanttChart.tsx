@@ -36,18 +36,21 @@ export const GanttChart: React.FC = () => {
     6: '#f9fafb'  // Saturday - very light gray
   });
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(new Date());
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, date: new Date() });
-  const [newTaskPreview, setNewTaskPreview] = useState<{ startDate: Date; endDate: Date; x: number } | null>(null);
+  const [newTaskPreview, setNewTaskPreview] = useState<{ startDate: Date; endDate: Date; x: number; y: number } | null>(null);
+  const [scrollOffset, setScrollOffset] = useState(0);
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+
+  const dayWidth = 180; // Made days much wider
 
   // Generate timeline dates (60 days from current date)
   const generateTimeline = () => {
     const timeline = [];
     const startDate = new Date(currentDate);
-    startDate.setDate(startDate.getDate() - 15); // Start 15 days before current date
+    startDate.setDate(startDate.getDate() - 15);
     startDate.setHours(0, 0, 0, 0);
     
     for (let i = 0; i < 60; i++) {
@@ -62,15 +65,15 @@ export const GanttChart: React.FC = () => {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  // Group dates by month for header
-  const monthGroups = timeline.reduce((acc, date) => {
+  // Group dates by month for header - Fixed TypeScript error
+  const monthGroups = timeline.reduce((acc: Record<string, { month: string; year: string; count: number }>, date) => {
     const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
     if (!acc[monthKey]) {
       acc[monthKey] = { month: monthNames[date.getMonth()], year: date.getFullYear().toString(), count: 0 };
     }
     acc[monthKey].count++;
     return acc;
-  }, {} as Record<string, { month: string; year: string; count: number }>);
+  }, {});
 
   // Arrange tasks in rows to avoid overlap
   const arrangeTasksInRows = () => {
@@ -135,6 +138,15 @@ export const GanttChart: React.FC = () => {
       newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
       return newDate;
     });
+    
+    // Smooth scroll animation
+    if (timelineRef.current) {
+      const scrollAmount = direction === 'next' ? dayWidth * 7 : -dayWidth * 7;
+      timelineRef.current.scrollBy({
+        left: scrollAmount,
+        behavior: 'smooth'
+      });
+    }
   };
 
   // Handle horizontal scrolling with mouse wheel
@@ -143,25 +155,30 @@ export const GanttChart: React.FC = () => {
       if (timelineRef.current && timelineRef.current.contains(e.target as Node)) {
         e.preventDefault();
         timelineRef.current.scrollLeft += e.deltaY;
+        setScrollOffset(timelineRef.current.scrollLeft);
       }
     };
 
-    document.addEventListener('wheel', handleWheel, { passive: false });
-    return () => document.removeEventListener('wheel', handleWheel);
+    const timelineElement = timelineRef.current;
+    if (timelineElement) {
+      timelineElement.addEventListener('wheel', handleWheel, { passive: false });
+      return () => timelineElement.removeEventListener('wheel', handleWheel);
+    }
   }, []);
 
-  // Handle drag to create tasks
+  // Handle drag to create tasks - Only with left mouse button
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only left mouse button
     if (e.target === chartRef.current) {
       const rect = chartRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left + (timelineRef.current?.scrollLeft || 0);
-      const dayIndex = Math.floor(x / 60);
+      const y = e.clientY - rect.top;
+      const dayIndex = Math.floor(x / dayWidth);
       const date = timeline[dayIndex];
       
       if (date) {
         setIsDragging(true);
-        setDragStart({ x, date });
-        setNewTaskPreview({ startDate: date, endDate: date, x });
+        setNewTaskPreview({ startDate: date, endDate: date, x, y });
       }
     }
   };
@@ -170,7 +187,7 @@ export const GanttChart: React.FC = () => {
     if (isDragging && newTaskPreview && chartRef.current) {
       const rect = chartRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left + (timelineRef.current?.scrollLeft || 0);
-      const dayIndex = Math.floor(x / 60);
+      const dayIndex = Math.floor(x / dayWidth);
       const endDate = timeline[dayIndex] || newTaskPreview.endDate;
       
       setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
@@ -179,6 +196,10 @@ export const GanttChart: React.FC = () => {
 
   const handleMouseUp = () => {
     if (isDragging && newTaskPreview) {
+      // Find appropriate row for the new task
+      const taskY = newTaskPreview.y;
+      const rowIndex = Math.floor((taskY - 20) / 80);
+      
       const newTask: Task = {
         id: Date.now().toString(),
         title: 'New Task',
@@ -196,46 +217,62 @@ export const GanttChart: React.FC = () => {
     setNewTaskPreview(null);
   };
 
+  // Handle calendar date selection
+  const handleCalendarDateSelect = (date: Date | undefined) => {
+    setSelectedCalendarDate(date);
+    if (date && timelineRef.current) {
+      // Find the date in timeline and scroll to it
+      const dayIndex = timeline.findIndex(d => d.toDateString() === date.toDateString());
+      if (dayIndex !== -1) {
+        const scrollPosition = dayIndex * dayWidth - (timelineRef.current.clientWidth / 2) + (dayWidth / 2);
+        timelineRef.current.scrollTo({
+          left: Math.max(0, scrollPosition),
+          behavior: 'smooth'
+        });
+      }
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-border bg-card rounded-t-xl">
+      <div className="flex items-center justify-between p-6 border-b border-border bg-card">
         <h1 className="text-2xl font-bold">Study Gantt Chart</h1>
         <div className="flex items-center gap-3">
-          <Button onClick={handleAddTask} size="sm" className="rounded-full">
+          <Button onClick={handleAddTask} size="sm" className="rounded-lg">
             <Plus className="w-4 h-4 mr-2" />
             Add Task
           </Button>
-          <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-full">
+          <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-lg">
             <Settings className="w-4 h-4" />
           </Button>
-          <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-full">
+          <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-lg">
             {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
           </Button>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden rounded-b-xl">
+      <div className="flex-1 flex overflow-hidden">
         {/* Calendar Sidebar */}
-        <div className="w-80 border-r border-border bg-card flex flex-col rounded-bl-xl">
+        <div className="w-80 border-r border-border bg-card flex flex-col">
           <div className="p-4 border-b border-border">
             <h2 className="font-semibold mb-4">Calendar</h2>
             <Calendar
               mode="single"
-              selected={currentDate}
-              onSelect={(date) => date && setCurrentDate(date)}
+              selected={selectedCalendarDate}
+              onSelect={handleCalendarDateSelect}
               className="rounded-lg"
             />
           </div>
           <div className="flex-1 p-4">
             <h3 className="font-medium mb-3">Navigation</h3>
             <div className="flex gap-2">
-              <Button onClick={() => navigateDate('prev')} variant="outline" size="sm" className="rounded-full flex-1">
+              <Button onClick={() => navigateDate('prev')} variant="outline" size="sm" className="rounded-lg flex-1">
                 <ChevronLeft className="w-4 h-4" />
                 Earlier
               </Button>
-              <Button onClick={() => navigateDate('next')} variant="outline" size="sm" className="rounded-full flex-1">
+              <Button onClick={() => navigateDate('next')} variant="outline" size="sm" className="rounded-lg flex-1">
                 Later
                 <ChevronRight className="w-4 h-4" />
               </Button>
@@ -244,14 +281,17 @@ export const GanttChart: React.FC = () => {
         </div>
 
         {/* Timeline Area */}
-        <div className="flex-1 flex flex-col overflow-hidden rounded-br-xl">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Month Header */}
-          <div className="flex border-b border-border bg-card overflow-hidden">
+          <div 
+            className="flex border-b border-border bg-card overflow-hidden"
+            style={{ transform: `translateX(-${scrollOffset}px)` }}
+          >
             {Object.entries(monthGroups).map(([key, { month, year, count }]) => (
               <div 
                 key={key}
-                className="border-r border-border px-4 py-4 text-center font-semibold bg-muted/30 rounded-t-lg"
-                style={{ minWidth: `${count * 60}px` }}
+                className="border-r border-border px-4 py-4 text-center font-semibold bg-muted/30"
+                style={{ minWidth: `${count * dayWidth}px` }}
               >
                 {month} {year}
               </div>
@@ -261,33 +301,36 @@ export const GanttChart: React.FC = () => {
           {/* Day Header */}
           <div 
             ref={timelineRef}
-            className="flex border-b border-border bg-card overflow-x-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
-            style={{ scrollbarWidth: 'thin' }}
+            className="flex border-b border-border bg-card overflow-x-auto scrollbar-thin"
+            onScroll={(e) => setScrollOffset((e.target as HTMLDivElement).scrollLeft)}
           >
             {timeline.map((date, index) => {
               const isWeekStart = date.getDay() === 0;
               const isMonthStart = date.getDate() === 1;
+              const isSelectedDate = selectedCalendarDate && date.toDateString() === selectedCalendarDate.toDateString();
+              
               return (
                 <div 
                   key={index}
-                  className="relative border-r border-border p-3 text-center text-sm rounded-t-lg transition-colors duration-200"
+                  className={`relative border-r border-border p-4 text-center text-sm transition-all duration-200 ${
+                    isSelectedDate ? 'bg-primary/20 border-primary' : ''
+                  }`}
                   style={{ 
-                    backgroundColor: theme === 'dark' 
+                    backgroundColor: isSelectedDate ? undefined : (theme === 'dark' 
                       ? dayColors[date.getDay()] === '#ffffff' ? '#1f2937' : '#374151'
-                      : dayColors[date.getDay()],
-                    minWidth: '60px'
+                      : dayColors[date.getDay()]),
+                    minWidth: `${dayWidth}px`,
+                    borderLeftWidth: isWeekStart ? '1px' : '0px',
+                    borderLeftColor: isWeekStart ? 'hsl(var(--border))' : 'transparent',
+                    borderLeftMargin: isMonthStart ? '2px' : '0px'
                   }}
                 >
-                  {/* Week divider */}
-                  {isWeekStart && (
-                    <div className="absolute left-0 top-0 bottom-0 w-px bg-border opacity-60" />
-                  )}
                   {/* Month divider */}
                   {isMonthStart && (
                     <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-border" />
                   )}
-                  <div className="font-medium">{date.getDate()}</div>
-                  <div className="text-xs text-muted-foreground">{dayNames[date.getDay()]}</div>
+                  <div className="font-semibold text-lg">{date.getDate()}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{dayNames[date.getDay()]}</div>
                 </div>
               );
             })}
@@ -296,7 +339,7 @@ export const GanttChart: React.FC = () => {
           {/* Tasks Timeline */}
           <div 
             ref={chartRef}
-            className="flex-1 overflow-auto relative bg-background rounded-br-xl"
+            className="flex-1 overflow-auto relative bg-background"
             style={{ minHeight: '500px' }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -310,14 +353,14 @@ export const GanttChart: React.FC = () => {
                 <React.Fragment key={`lines-${index}`}>
                   {isWeekStart && (
                     <div 
-                      className="absolute top-0 bottom-0 w-px bg-border/30 pointer-events-none"
-                      style={{ left: `${index * 60}px` }}
+                      className="absolute top-0 bottom-0 w-px bg-border/20 pointer-events-none"
+                      style={{ left: `${index * dayWidth - scrollOffset}px` }}
                     />
                   )}
                   {isMonthStart && (
                     <div 
-                      className="absolute top-0 bottom-0 w-0.5 bg-border/50 pointer-events-none"
-                      style={{ left: `${index * 60}px` }}
+                      className="absolute top-0 bottom-0 w-0.5 bg-border/40 pointer-events-none"
+                      style={{ left: `${index * dayWidth - scrollOffset}px` }}
                     />
                   )}
                 </React.Fragment>
@@ -331,6 +374,8 @@ export const GanttChart: React.FC = () => {
                 task={task}
                 timeline={timeline}
                 yPosition={(task as any).rowIndex * 80 + 20}
+                dayWidth={dayWidth}
+                scrollOffset={scrollOffset}
                 onUpdate={(updates) => handleTaskUpdate(task.id, updates)}
                 onClick={() => handleTaskClick(task)}
               />
@@ -344,13 +389,13 @@ export const GanttChart: React.FC = () => {
                   left: `${Math.min(
                     timeline.findIndex(d => d.toDateString() === newTaskPreview.startDate.toDateString()),
                     timeline.findIndex(d => d.toDateString() === newTaskPreview.endDate.toDateString())
-                  ) * 60}px`,
-                  top: '20px',
+                  ) * dayWidth - scrollOffset}px`,
+                  top: `${Math.floor((newTaskPreview.y - 20) / 80) * 80 + 20}px`,
                   width: `${Math.abs(
                     timeline.findIndex(d => d.toDateString() === newTaskPreview.endDate.toDateString()) -
                     timeline.findIndex(d => d.toDateString() === newTaskPreview.startDate.toDateString())
-                  ) * 60 + 60}px`,
-                  height: '36px'
+                  ) * dayWidth + dayWidth}px`,
+                  height: '44px'
                 }}
               />
             )}
