@@ -7,6 +7,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { TaskEditModal } from '@/components/TaskEditModal';
 import { AddTaskModal } from '@/components/AddTaskModal';
 import { KanbanView } from '@/components/KanbanView';
+import { SettingsModal } from '@/components/SettingsModal';
 import type { Task, DayColors } from '@/types/gantt';
 
 interface GanttChartProps {
@@ -14,6 +15,7 @@ interface GanttChartProps {
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
   onTaskDelete: (taskId: string) => void;
   onTaskCreate: (task: Task) => void;
+  onTaskClick: (task: Task) => void;
 }
 
 interface TaskBarProps {
@@ -67,6 +69,8 @@ const TaskBar: React.FC<TaskBarProps> = ({ task, onClick, days, dayWidth, dayCol
 export const GanttChart: React.FC<GanttChartProps> = ({
   tasks,
   onTaskUpdate,
+  onTaskDelete,
+  onTaskCreate,
   onTaskClick
 }) => {
   const [currentView, setCurrentView] = useState<'gantt' | 'kanban'>('gantt');
