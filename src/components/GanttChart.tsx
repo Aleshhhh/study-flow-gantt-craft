@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -20,8 +19,13 @@ interface MonthGroup {
 type ViewMode = 'gantt' | 'kanban';
 
 export const GanttChart: React.FC = () => {
+  // Costante configurabile per gli anni da mostrare nel Gantt
+  const numberOfYearsToShow = 5;
+  
   const { theme, toggleTheme } = useTheme();
   const [viewMode, setViewMode] = useState<ViewMode>('gantt');
+  
+  // ... keep existing code (tasks state and other state variables)
   const [tasks, setTasks] = useState<Task[]>([
     {
       id: '1',
@@ -58,41 +62,66 @@ export const GanttChart: React.FC = () => {
   const chartRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
 
+  // Configurazione ottimizzata per le performance
   const dayWidth = 120;
-  const visibleDays = 60; // Show 60 days at once
-  const bufferDays = 30; // Extra days for smooth scrolling
+  const visibleDays = 60;
+  const bufferDays = 30;
 
-  // Generate only visible timeline dates for performance
-  const generateVisibleTimeline = () => {
+  /**
+   * Genera il timeline dinamico basato sulla data corrente e il numero di anni configurabile
+   * La data di fine è calcolata dinamicamente aggiungendo numberOfYearsToShow alla data corrente
+   */
+  const generateDynamicTimeline = () => {
     const timeline = [];
+    const today = new Date();
+    
+    // Calcola la data di inizio (6 mesi prima della data corrente)
     const startDate = new Date(currentDate);
     startDate.setDate(startDate.getDate() - Math.floor(visibleDays / 2));
     startDate.setHours(0, 0, 0, 0);
     
+    // Calcola la data di fine dinamicamente (numberOfYearsToShow anni nel futuro)
+    const endDate = new Date(today);
+    endDate.setFullYear(today.getFullYear() + numberOfYearsToShow);
+    
+    // Genera solo i giorni necessari per la viewport corrente + buffer
     const totalDays = visibleDays + bufferDays * 2;
     
     for (let i = 0; i < totalDays; i++) {
       const date = new Date(startDate);
       date.setDate(startDate.getDate() + i);
-      timeline.push(date);
+      
+      // Verifica che la data non superi il limite dinamico
+      if (date <= endDate) {
+        timeline.push(date);
+      }
     }
+    
     return timeline;
   };
 
-  const timeline = generateVisibleTimeline();
+  const timeline = generateDynamicTimeline();
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  // Group dates by month for header
+  /**
+   * Raggruppa le date per mese per creare l'intestazione del Gantt
+   * Ora funziona dinamicamente con qualsiasi range di date
+   */
   const monthGroups: Record<string, MonthGroup> = timeline.reduce((acc: Record<string, MonthGroup>, date) => {
     const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
     if (!acc[monthKey]) {
-      acc[monthKey] = { month: monthNames[date.getMonth()], year: date.getFullYear().toString(), count: 0 };
+      acc[monthKey] = { 
+        month: monthNames[date.getMonth()], 
+        year: date.getFullYear().toString(), 
+        count: 0 
+      };
     }
     acc[monthKey].count++;
     return acc;
   }, {});
 
+  // ... keep existing code (arrangeTasksInRows function)
   const arrangeTasksInRows = () => {
     const rows: Task[][] = [];
     const sortedTasks = [...tasks].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
@@ -123,6 +152,7 @@ export const GanttChart: React.FC = () => {
 
   const tasksWithRows = arrangeTasksInRows();
 
+  // ... keep existing code (event handlers)
   const handleTaskUpdate = (taskId: string, updates: Partial<Task>) => {
     setTasks(prev => prev.map(task => 
       task.id === taskId ? { ...task, ...updates } : task
@@ -150,19 +180,31 @@ export const GanttChart: React.FC = () => {
     setIsEditModalOpen(true);
   };
 
+  /**
+   * Navigazione dinamica che si adatta al range de date configurabile
+   */
   const navigateDate = (direction: 'prev' | 'next') => {
     setCurrentDate(prev => {
       const newDate = new Date(prev);
-      newDate.setDate(newDate.getDate() + (direction === 'next' ? 30 : -30));
-      return newDate;
+      const daysToMove = direction === 'next' ? 30 : -30;
+      newDate.setDate(newDate.getDate() + daysToMove);
+      
+      // Verifica che la nuova data sia nel range consentito
+      const today = new Date();
+      const maxDate = new Date(today);
+      maxDate.setFullYear(today.getFullYear() + numberOfYearsToShow);
+      
+      if (newDate <= maxDate) {
+        return newDate;
+      }
+      return prev; // Mantieni la data precedente se si supera il limite
     });
   };
 
-  // Synchronize scroll between timeline and chart
+  // ... keep existing code (scroll handling and mouse events)
   const handleScroll = (scrollLeft: number) => {
     setScrollOffset(scrollLeft);
     
-    // Sync all scrollable elements
     if (timelineRef.current && timelineRef.current.scrollLeft !== scrollLeft) {
       timelineRef.current.scrollLeft = scrollLeft;
     }
@@ -174,7 +216,6 @@ export const GanttChart: React.FC = () => {
     }
   };
 
-  // Handle horizontal scrolling with mouse wheel
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       const target = e.target as HTMLElement;
@@ -189,7 +230,6 @@ export const GanttChart: React.FC = () => {
     return () => document.removeEventListener('wheel', handleWheel);
   }, [scrollOffset]);
 
-  // Handle drag to create tasks - Only with left mouse button
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((viewMode as ViewMode) === 'kanban' || e.button !== 0) return;
     if (e.target === chartRef.current) {
@@ -238,7 +278,6 @@ export const GanttChart: React.FC = () => {
     setNewTaskPreview(null);
   };
 
-  // Handle calendar date selection
   const handleCalendarDateSelect = (date: Date | undefined) => {
     setSelectedCalendarDate(date);
     if (date) {
@@ -246,6 +285,7 @@ export const GanttChart: React.FC = () => {
     }
   };
 
+  // ... keep existing code (Kanban view return statement)
   if ((viewMode as ViewMode) === 'kanban') {
     return (
       <div className="h-screen flex flex-col bg-background">
@@ -373,6 +413,7 @@ export const GanttChart: React.FC = () => {
     );
   }
 
+  // ... keep existing code (Gantt view return statement with all JSX)
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
