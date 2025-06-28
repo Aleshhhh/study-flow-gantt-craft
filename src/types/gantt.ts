@@ -6,6 +6,8 @@ export interface Task {
   startDate: Date;
   endDate: Date;
   color: string;
+  textColor?: string;
+  progressBarColor?: string;
   milestones: string[];
   status?: string;
 }
