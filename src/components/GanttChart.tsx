@@ -42,13 +42,13 @@ export const GanttChart: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [dayColors, setDayColors] = useState<DayColors>({
-    0: theme === 'dark' ? '#1f2937' : '#f3f4f6', 
-    1: theme === 'dark' ? '#111827' : '#ffffff', 
-    2: theme === 'dark' ? '#111827' : '#ffffff', 
-    3: theme === 'dark' ? '#111827' : '#ffffff',
-    4: theme === 'dark' ? '#111827' : '#ffffff', 
-    5: theme === 'dark' ? '#111827' : '#ffffff', 
-    6: theme === 'dark' ? '#1f2937' : '#f9fafb'
+    0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
+    1: theme === 'dark' ? '#020617' : '#ffffff', 
+    2: theme === 'dark' ? '#020617' : '#ffffff', 
+    3: theme === 'dark' ? '#020617' : '#ffffff',
+    4: theme === 'dark' ? '#020617' : '#ffffff', 
+    5: theme === 'dark' ? '#020617' : '#ffffff', 
+    6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
   });
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(new Date());
@@ -75,13 +75,13 @@ export const GanttChart: React.FC = () => {
   // Update day colors when theme changes
   useEffect(() => {
     setDayColors({
-      0: theme === 'dark' ? '#1f2937' : '#f3f4f6', 
-      1: theme === 'dark' ? '#111827' : '#ffffff', 
-      2: theme === 'dark' ? '#111827' : '#ffffff', 
-      3: theme === 'dark' ? '#111827' : '#ffffff',
-      4: theme === 'dark' ? '#111827' : '#ffffff', 
-      5: theme === 'dark' ? '#111827' : '#ffffff', 
-      6: theme === 'dark' ? '#1f2937' : '#f9fafb'
+      0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
+      1: theme === 'dark' ? '#020617' : '#ffffff', 
+      2: theme === 'dark' ? '#020617' : '#ffffff', 
+      3: theme === 'dark' ? '#020617' : '#ffffff',
+      4: theme === 'dark' ? '#020617' : '#ffffff', 
+      5: theme === 'dark' ? '#020617' : '#ffffff', 
+      6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
     });
   }, [theme]);
 
@@ -99,7 +99,7 @@ export const GanttChart: React.FC = () => {
           setScrollOffset(savedScrollPositions.gantt);
         }
       }, 50);
-    } else {
+    } else if (viewMode === 'kanban') {
       // Save current scroll position when leaving Gantt view
       setSavedScrollPositions(prev => ({
         ...prev,
