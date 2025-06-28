@@ -1,25 +1,16 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { Task } from '@/types/gantt';
 
 interface TaskBarProps {
   task: Task;
-  timeline: Date[];
-  yPosition: number;
-  dayWidth: number;
-  scrollOffset: number;
-  onUpdate: (updates: Partial<Task>) => void;
+  viewStartDate: Date;
   onClick: () => void;
 }
 
 export const TaskBar: React.FC<TaskBarProps> = ({ 
   task, 
-  timeline, 
-  yPosition, 
-  dayWidth,
-  scrollOffset,
-  onUpdate, 
+  viewStartDate,
   onClick 
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -29,7 +20,25 @@ export const TaskBar: React.FC<TaskBarProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, startDate: new Date() });
   const barRef = useRef<HTMLDivElement>(null);
 
-  // Calculate task position and width - fixed to not use scrollOffset since tasks are positioned absolutely
+  const dayWidth = 120;
+
+  // Calculate timeline for 30 days from viewStartDate
+  const getTimeline = () => {
+    const days = [];
+    const startDate = new Date(viewStartDate);
+    
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      days.push(date);
+    }
+    
+    return days;
+  };
+
+  const timeline = getTimeline();
+
+  // Calculate task position based on start and end dates
   const getTaskPosition = () => {
     const startIndex = timeline.findIndex(date => 
       date.toDateString() === task.startDate.toDateString()
@@ -38,13 +47,18 @@ export const TaskBar: React.FC<TaskBarProps> = ({
       date.toDateString() === task.endDate.toDateString()
     );
     
-    const left = Math.max(0, startIndex * dayWidth);
-    const width = Math.max(dayWidth, (endIndex - startIndex + 1) * dayWidth);
+    if (startIndex === -1) return { left: 0, width: dayWidth };
+    
+    const left = startIndex * dayWidth;
+    const width = Math.max(dayWidth, (Math.max(endIndex, startIndex) - startIndex + 1) * dayWidth);
     
     return { left, width };
   };
 
   const { left, width } = getTaskPosition();
+
+  // Calculate Y position based on task index (simple stacking)
+  const yPosition = Math.abs(task.id.charCodeAt(0) % 10) * 60 + 20;
 
   const getTextColor = (backgroundColor: string) => {
     const hex = backgroundColor.replace('#', '');
@@ -74,6 +88,11 @@ export const TaskBar: React.FC<TaskBarProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsResizingRight(true);
+  };
+
+  const onUpdate = (updates: Partial<Task>) => {
+    // This would need to be passed from parent component
+    console.log('Task update:', updates);
   };
 
   useEffect(() => {

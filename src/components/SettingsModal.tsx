@@ -9,13 +9,17 @@ interface SettingsModalProps {
   onClose: () => void;
   dayColors: DayColors;
   onDayColorsChange: (colors: DayColors) => void;
+  selectedDate?: Date | null;
+  onDateSelect?: (date: Date) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   dayColors,
-  onDayColorsChange
+  onDayColorsChange,
+  selectedDate,
+  onDateSelect
 }) => {
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   

@@ -10,11 +10,13 @@ import { TaskBar } from './TaskBar';
 import { KanbanView } from './KanbanView';
 import type { Task, DayColors } from '@/types/gantt';
 
+type ViewType = 'gantt' | 'kanban';
+
 const GanttChart = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [currentView, setCurrentView] = useState<'gantt' | 'kanban'>('gantt');
+  const [currentView, setCurrentView] = useState<ViewType>('gantt');
   const [viewStartDate, setViewStartDate] = useState(new Date());
   const [dayColors, setDayColors] = useState<DayColors>({});
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
