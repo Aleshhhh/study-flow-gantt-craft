@@ -29,9 +29,10 @@ export const TaskBar: React.FC<TaskBarProps> = ({
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, startDate: new Date() });
+  const [isClicked, setIsClicked] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
 
-  // Calculate task position and width - fixed to not use scrollOffset since tasks are positioned absolutely
+  // Calculate task position and width
   const getTaskPosition = () => {
     const startIndex = timeline.findIndex(date => 
       date.toDateString() === task.startDate.toDateString()
@@ -77,6 +78,15 @@ export const TaskBar: React.FC<TaskBarProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsResizingRight(true);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isDragging && !isResizingLeft && !isResizingRight) {
+      setIsClicked(true);
+      onClick();
+      // Reset click state after animation
+      setTimeout(() => setIsClicked(false), 200);
+    }
   };
 
   useEffect(() => {
@@ -137,11 +147,15 @@ export const TaskBar: React.FC<TaskBarProps> = ({
     };
   }, [isDragging, isResizingLeft, isResizingRight, dragStart, task, dayWidth, onUpdate]);
 
+  const isInteracting = isDragging || isResizingLeft || isResizingRight;
+
   return (
     <>
       <div
         ref={barRef}
-        className="absolute rounded-xl shadow-sm border transition-all duration-300 hover:shadow-lg cursor-pointer group hover:scale-102"
+        className={`absolute rounded-xl shadow-sm border transition-all duration-200 ease-out cursor-pointer group ${
+          isInteracting ? 'shadow-lg scale-[1.02] z-10' : 'hover:shadow-md hover:scale-[1.01] z-[1]'
+        } ${isClicked ? 'animate-pulse' : ''}`}
         style={{
           left: `${left}px`,
           top: `${yPosition}px`,
@@ -150,20 +164,16 @@ export const TaskBar: React.FC<TaskBarProps> = ({
           backgroundColor: task.color,
           borderColor: task.color,
           color: getTextColor(task.color),
-          zIndex: isDragging || isResizingLeft || isResizingRight ? 10 : 1,
-          transform: isDragging || isResizingLeft || isResizingRight ? 'scale(1.02)' : 'scale(1)'
+          transform: isInteracting ? 'scale(1.02)' : undefined,
+          transition: 'all 0.2s ease-out'
         }}
         onMouseDown={handleMouseDown}
-        onClick={(e) => {
-          if (!isDragging && !isResizingLeft && !isResizingRight) {
-            onClick();
-          }
-        }}
+        onClick={handleClick}
       >
         <div className="task-content h-full px-4 py-2 flex items-center justify-between pointer-events-none">
           <div className="task-content flex items-center gap-2 flex-1 truncate">
             <button
-              className="pointer-events-auto opacity-70 hover:opacity-100 transition-all duration-300 hover:scale-110"
+              className="pointer-events-auto opacity-70 hover:opacity-100 transition-all duration-200 hover:scale-110"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsExpanded(!isExpanded);
@@ -182,13 +192,13 @@ export const TaskBar: React.FC<TaskBarProps> = ({
           
           {/* Left resize handle */}
           <div 
-            className="absolute left-0 top-0 w-2 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-auto rounded-l-xl"
+            className="absolute left-0 top-0 w-2 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-auto rounded-l-xl hover:bg-opacity-30"
             onMouseDown={handleLeftResizeMouseDown}
           />
           
           {/* Right resize handle */}
           <div 
-            className="absolute right-0 top-0 w-2 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-auto rounded-r-xl"
+            className="absolute right-0 top-0 w-2 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-auto rounded-r-xl hover:bg-opacity-30"
             onMouseDown={handleRightResizeMouseDown}
           />
         </div>
@@ -197,7 +207,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
       {/* Expanded description */}
       {isExpanded && task.description && (
         <div
-          className="absolute bg-card border border-border rounded-xl shadow-xl p-4 max-w-md z-20 transition-all duration-300 animate-in slide-in-from-top-2"
+          className="absolute bg-card border border-border rounded-xl shadow-xl p-4 max-w-md z-20 transition-all duration-200 animate-in slide-in-from-top-2"
           style={{
             left: `${left}px`,
             top: `${yPosition + 50}px`

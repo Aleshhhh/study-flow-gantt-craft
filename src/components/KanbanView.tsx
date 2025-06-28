@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -184,6 +183,18 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     return luminance > 0.5 ? '#000000' : '#ffffff';
   };
 
+  const handleTaskClick = (task: Task) => {
+    // Add visual feedback for click
+    const taskElement = document.querySelector(`[data-task-id="${task.id}"]`);
+    if (taskElement) {
+      taskElement.classList.add('animate-pulse');
+      setTimeout(() => {
+        taskElement.classList.remove('animate-pulse');
+      }, 200);
+    }
+    onTaskClick(task);
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
@@ -280,8 +291,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     handleTaskDrop(e, column.id);
                     handleColumnDrop(e, index);
                   }}
-                  className={`flex-shrink-0 w-80 sm:w-96 lg:flex-1 lg:min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-300 cursor-move ${
-                    isTaskDraggedOver ? 'border-primary bg-primary/5 scale-102' : ''
+                  className={`flex-shrink-0 w-80 sm:w-96 lg:flex-1 lg:min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-200 ease-out cursor-move ${
+                    isTaskDraggedOver ? 'border-primary bg-primary/5 scale-[1.02]' : ''
                   } ${
                     isColumnDraggedOver && draggedColumn ? 'border-orange-500 bg-orange-50 dark:bg-orange-950' : ''
                   }`}
@@ -315,16 +326,17 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       return (
                         <div
                           key={task.id}
+                          data-task-id={task.id}
                           draggable
                           onDragStart={() => handleTaskDragStart(task.id)}
                           onDragOver={(e) => handleTaskDragOver(e, undefined, task.id)}
                           onDragLeave={handleTaskDragLeave}
                           onDrop={(e) => handleTaskDrop(e, undefined, task.id)}
-                          onClick={() => onTaskClick(task)}
-                          className={`p-3 sm:p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md hover:scale-102 group active:scale-95 touch-manipulation ${
+                          onClick={() => handleTaskClick(task)}
+                          className={`p-3 sm:p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-200 ease-out hover:shadow-md hover:scale-[1.02] group active:scale-95 touch-manipulation ${
                             isBeingDragged ? 'opacity-50 scale-95' : ''
                           } ${
-                            isDraggedOver ? 'border-primary border-2 scale-102' : ''
+                            isDraggedOver ? 'border-primary border-2 scale-[1.02]' : ''
                           }`}
                           style={{
                             backgroundColor: task.color,
