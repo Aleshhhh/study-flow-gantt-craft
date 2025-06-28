@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { Plus, GripVertical, Trash2 } from 'lucide-react';
 import type { Task, KanbanColumn } from '@/types/gantt';
 
@@ -24,6 +25,17 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
+
+  // Calculate progress based on column position
+  const calculateProgress = (status: string) => {
+    const columnIndex = columns.findIndex(col => col.title === status);
+    if (columnIndex === -1) return 0;
+    
+    // Progress is based on position in the column array
+    // First column = 0%, last column = 100%, others distributed evenly
+    if (columns.length === 1) return 100;
+    return (columnIndex / (columns.length - 1)) * 100;
+  };
 
   // Group tasks by status
   const getTasksByStatus = (status: string) => {
@@ -128,38 +140,56 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               </div>
               
               <div className="p-4 space-y-3 min-h-96">
-                {columnTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    draggable
-                    onDragStart={() => handleDragStart(task.id)}
-                    onClick={() => onTaskClick(task)}
-                    className="p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md hover:scale-102 group"
-                    style={{
-                      backgroundColor: task.color,
-                      borderColor: task.color,
-                      color: getTextColor(task.color)
-                    }}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
-                      <GripVertical className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    {task.description && (
-                      <p className="text-xs opacity-80 line-clamp-2 mb-3">
-                        {task.description}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between text-xs opacity-70">
-                      <span>
-                        {task.startDate.toLocaleDateString()} - {task.endDate.toLocaleDateString()}
-                      </span>
-                      {task.milestones.length > 0 && (
-                        <span>{task.milestones.length} milestones</span>
+                {columnTasks.map((task) => {
+                  const progress = calculateProgress(task.status || 'To Do');
+                  
+                  return (
+                    <div
+                      key={task.id}
+                      draggable
+                      onDragStart={() => handleDragStart(task.id)}
+                      onClick={() => onTaskClick(task)}
+                      className="p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md hover:scale-102 group"
+                      style={{
+                        backgroundColor: task.color,
+                        borderColor: task.color,
+                        color: getTextColor(task.color)
+                      }}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
+                        <GripVertical className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      
+                      {task.description && (
+                        <p className="text-xs opacity-80 line-clamp-2 mb-3">
+                          {task.description}
+                        </p>
                       )}
+                      
+                      {/* Progress Bar */}
+                      <div className="mb-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs opacity-70">Progress</span>
+                          <span className="text-xs opacity-70">{Math.round(progress)}%</span>
+                        </div>
+                        <Progress 
+                          value={progress} 
+                          className="h-2 bg-black/20"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-xs opacity-70">
+                        <span>
+                          {task.startDate.toLocaleDateString()} - {task.endDate.toLocaleDateString()}
+                        </span>
+                        {task.milestones.length > 0 && (
+                          <span>{task.milestones.length} milestones</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
