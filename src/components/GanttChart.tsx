@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -47,6 +48,7 @@ export const GanttChart: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(new Date());
   const [isDragging, setIsDragging] = useState(false);
+  const [isTaskBeingDragged, setIsTaskBeingDragged] = useState(false);
   const [newTaskPreview, setNewTaskPreview] = useState<{ startDate: Date; endDate: Date; x: number; y: number } | null>(null);
   
   // --- STATE E REFS PER LA TIMELINE INFINITA ---
@@ -201,7 +203,7 @@ export const GanttChart: React.FC = () => {
 
   // --- LOGICA DRAG & DROP ---
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (viewMode === 'kanban' || e.button !== 0) return;
+    if (viewMode === 'kanban' || e.button !== 0 || isTaskBeingDragged) return;
     const target = e.target as HTMLElement;
     if (target.closest('.task-bar')) return;
 
@@ -219,7 +221,7 @@ export const GanttChart: React.FC = () => {
     }
   };
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (viewMode === 'kanban' || !isDragging || !newTaskPreview || !chartRef.current) return;
+    if (viewMode === 'kanban' || !isDragging || !newTaskPreview || !chartRef.current || isTaskBeingDragged) return;
     const rect = chartRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left + scrollOffset;
     const dayIndex = Math.max(0, Math.floor(x / dayWidth));
@@ -227,7 +229,7 @@ export const GanttChart: React.FC = () => {
     setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
   };
   const handleMouseUp = () => {
-    if (viewMode === 'kanban' || !isDragging || !newTaskPreview) return;
+    if (viewMode === 'kanban' || !isDragging || !newTaskPreview || isTaskBeingDragged) return;
     const { startDate, endDate } = newTaskPreview;
     if (startDate.getTime() === endDate.getTime()) {
          setIsDragging(false);
@@ -262,9 +264,62 @@ export const GanttChart: React.FC = () => {
         <div className="h-screen flex flex-col bg-background">
             {/* Header Kanban */}
             <div className="flex items-center justify-between p-2 sm:p-6 border-b border-border bg-card">
-              <h1 className="text-base sm:text-2xl font-bold truncate">Study Kanban</h1>
+              <h1 className="text-base sm:text-2xl font-bold truncate">Kanban</h1>
               <div className="flex items-center gap-1 sm:gap-2">
-                 {/* Controlli Kanban (omessi per brevità, sono identici al codice originale) */}
+                 {/* Controlli Mobile */}
+                 <div className="sm:hidden">
+                     <Sheet>
+                         <SheetTrigger asChild>
+                             <Button variant="outline" size="sm"><Menu className="w-4 h-4" /></Button>
+                         </SheetTrigger>
+                         <SheetContent side="right" className="w-80">
+                             <SheetHeader>
+                                 <SheetTitle>Menu</SheetTitle>
+                             </SheetHeader>
+                             <div className="space-y-4 mt-6">
+                                 <div className="flex flex-col gap-2">
+                                     <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'outline'} className="w-full justify-start">
+                                         <BarChart3 className="w-4 h-4 mr-2" />Gantt
+                                     </Button>
+                                     <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'outline'} className="w-full justify-start">
+                                         <Kanban className="w-4 h-4 mr-2" />Kanban
+                                     </Button>
+                                 </div>
+                                 <Button onClick={() => setIsCalendarOpen(true)} variant="outline" className="w-full justify-start">
+                                     <CalendarIcon className="w-4 h-4 mr-2" />Calendar
+                                 </Button>
+                                 <Button onClick={handleAddTask} className="w-full justify-start">
+                                     <Plus className="w-4 h-4 mr-2" />Add Task
+                                 </Button>
+                                 <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="w-full justify-start">
+                                     <Settings className="w-4 h-4 mr-2" />Settings
+                                 </Button>
+                                 <Button onClick={toggleTheme} variant="outline" className="w-full justify-start">
+                                     {theme === 'light' ? <Moon className="w-4 h-4 mr-2" /> : <Sun className="w-4 h-4 mr-2" />}
+                                     {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                                 </Button>
+                             </div>
+                         </SheetContent>
+                     </Sheet>
+                 </div>
+                {/* Controlli Desktop */}
+                 <div className="hidden sm:flex items-center gap-3">
+                     <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                        <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'ghost'} size="sm" className="rounded-md"><BarChart3 className="w-4 h-4 mr-2" />Gantt</Button>
+                        <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="rounded-md"><Kanban className="w-4 h-4 mr-2" />Kanban</Button>
+                     </div>
+                     <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                         <SheetTrigger asChild>
+                             <Button variant="outline" size="sm" className="rounded-xl shadow-sm"><CalendarIcon className="w-4 h-4" /></Button>
+                         </SheetTrigger>
+                         <SheetContent side="left" className="w-auto p-0">
+                             <Calendar mode="single" selected={selectedCalendarDate} onSelect={handleCalendarDateSelect} className="rounded-xl"/>
+                         </SheetContent>
+                     </Sheet>
+                     <Button onClick={handleAddTask} size="sm" className="rounded-xl shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Task</Button>
+                     <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-xl shadow-sm"><Settings className="w-4 h-4" /></Button>
+                     <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-xl shadow-sm">{theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}</Button>
+                 </div>
               </div>
             </div>
             <KanbanView tasks={tasks} onTaskUpdate={handleTaskUpdate} onTaskClick={handleTaskClick} />
@@ -288,7 +343,32 @@ export const GanttChart: React.FC = () => {
                          <Button variant="outline" size="sm"><Menu className="w-4 h-4" /></Button>
                      </SheetTrigger>
                      <SheetContent side="right" className="w-80">
-                         {/* Contenuto del menu mobile (omesso per brevità) */}
+                         <SheetHeader>
+                             <SheetTitle>Menu</SheetTitle>
+                         </SheetHeader>
+                         <div className="space-y-4 mt-6">
+                             <div className="flex flex-col gap-2">
+                                 <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'outline'} className="w-full justify-start">
+                                     <BarChart3 className="w-4 h-4 mr-2" />Gantt
+                                 </Button>
+                                 <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'outline'} className="w-full justify-start">
+                                     <Kanban className="w-4 h-4 mr-2" />Kanban
+                                 </Button>
+                             </div>
+                             <Button onClick={() => setIsCalendarOpen(true)} variant="outline" className="w-full justify-start">
+                                 <CalendarIcon className="w-4 h-4 mr-2" />Calendar
+                             </Button>
+                             <Button onClick={handleAddTask} className="w-full justify-start">
+                                 <Plus className="w-4 h-4 mr-2" />Add Task
+                             </Button>
+                             <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="w-full justify-start">
+                                 <Settings className="w-4 h-4 mr-2" />Settings
+                             </Button>
+                             <Button onClick={toggleTheme} variant="outline" className="w-full justify-start">
+                                 {theme === 'light' ? <Moon className="w-4 h-4 mr-2" /> : <Sun className="w-4 h-4 mr-2" />}
+                                 {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                             </Button>
+                         </div>
                      </SheetContent>
                  </Sheet>
              </div>
@@ -348,7 +428,7 @@ export const GanttChart: React.FC = () => {
 
           {/* Tasks Timeline */}
           <div ref={chartRef} className="flex-1 overflow-auto relative bg-background"
-               style={{ minHeight: '200px', cursor: 'pointer' }}
+               style={{ minHeight: '200px', cursor: isDragging ? 'crosshair' : 'default' }}
                onScroll={handleMainScroll}
                onMouseDown={handleMouseDown}
                onMouseMove={handleMouseMove}
@@ -372,13 +452,22 @@ export const GanttChart: React.FC = () => {
 
                 {/* Task bars */}
                 {tasksWithRows.map((task) => (
-                    <TaskBar key={task.id} task={task} timeline={timeline} yPosition={(task as any).rowIndex * 60 + 10}
-                           dayWidth={dayWidth} scrollOffset={scrollOffset} onUpdate={(updates) => handleTaskUpdate(task.id, updates)}
-                           onClick={() => handleTaskClick(task)} />
+                    <TaskBar 
+                      key={task.id} 
+                      task={task} 
+                      timeline={timeline} 
+                      yPosition={(task as any).rowIndex * 60 + 10}
+                      dayWidth={dayWidth} 
+                      scrollOffset={scrollOffset} 
+                      onUpdate={(updates) => handleTaskUpdate(task.id, updates)}
+                      onClick={() => handleTaskClick(task)}
+                      onDragStart={() => setIsTaskBeingDragged(true)}
+                      onDragEnd={() => setIsTaskBeingDragged(false)}
+                    />
                 ))}
 
                 {/* New task preview */}
-                {newTaskPreview && (
+                {newTaskPreview && !isTaskBeingDragged && (
                     <div className="absolute rounded-lg border border-dashed border-primary bg-primary/20 pointer-events-none"
                          style={{
                              left: `${Math.min(timeline.findIndex(d => d.getTime() === newTaskPreview.startDate.getTime()), timeline.findIndex(d => d.getTime() === newTaskPreview.endDate.getTime())) * dayWidth}px`,

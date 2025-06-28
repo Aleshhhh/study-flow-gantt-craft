@@ -11,6 +11,8 @@ interface TaskBarProps {
   scrollOffset: number;
   onUpdate: (updates: Partial<Task>) => void;
   onClick: () => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
 export const TaskBar: React.FC<TaskBarProps> = ({ 
@@ -20,13 +22,16 @@ export const TaskBar: React.FC<TaskBarProps> = ({
   dayWidth,
   scrollOffset,
   onUpdate, 
-  onClick 
+  onClick,
+  onDragStart,
+  onDragEnd
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, startDate: new Date() });
+  const [hasMoved, setHasMoved] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
 
   // Calculate task position and width - fixed to not use scrollOffset since tasks are positioned absolutely
@@ -59,8 +64,11 @@ export const TaskBar: React.FC<TaskBarProps> = ({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('task-content')) {
       e.preventDefault();
+      e.stopPropagation();
       setIsDragging(true);
+      setHasMoved(false);
       setDragStart({ x: e.clientX, startDate: new Date(task.startDate) });
+      onDragStart?.();
     }
   };
 
@@ -68,18 +76,23 @@ export const TaskBar: React.FC<TaskBarProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsResizingLeft(true);
+    onDragStart?.();
   };
 
   const handleRightResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsResizingRight(true);
+    onDragStart?.();
   };
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
         const deltaX = e.clientX - dragStart.x;
+        if (Math.abs(deltaX) > 5) {
+          setHasMoved(true);
+        }
         const daysDelta = Math.round(deltaX / dayWidth);
         
         const newStartDate = new Date(dragStart.startDate);
@@ -118,9 +131,14 @@ export const TaskBar: React.FC<TaskBarProps> = ({
     };
 
     const handleMouseUp = () => {
+      if (isDragging || isResizingLeft || isResizingRight) {
+        onDragEnd?.();
+      }
       setIsDragging(false);
       setIsResizingLeft(false);
       setIsResizingRight(false);
+      // Reset hasMoved after a brief delay to allow click detection
+      setTimeout(() => setHasMoved(false), 100);
     };
 
     if (isDragging || isResizingLeft || isResizingRight) {
@@ -132,13 +150,20 @@ export const TaskBar: React.FC<TaskBarProps> = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, isResizingLeft, isResizingRight, dragStart, task, dayWidth, onUpdate]);
+  }, [isDragging, isResizingLeft, isResizingRight, dragStart, task, dayWidth, onUpdate, onDragEnd]);
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!hasMoved && !isDragging && !isResizingLeft && !isResizingRight) {
+      onClick();
+    }
+  };
 
   return (
     <>
       <div
         ref={barRef}
-        className="absolute rounded-xl shadow-sm border transition-all duration-300 hover:shadow-lg cursor-pointer group hover:scale-102"
+        className="absolute rounded-xl shadow-sm border transition-all duration-300 hover:shadow-lg cursor-pointer group hover:scale-102 task-bar"
         style={{
           left: `${left}px`,
           top: `${yPosition}px`,
@@ -151,11 +176,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
           transform: isDragging || isResizingLeft || isResizingRight ? 'scale(1.02)' : 'scale(1)'
         }}
         onMouseDown={handleMouseDown}
-        onClick={(e) => {
-          if (!isDragging && !isResizingLeft && !isResizingRight) {
-            onClick();
-          }
-        }}
+        onClick={handleClick}
       >
         <div className="task-content h-full px-4 py-2 flex items-center justify-between pointer-events-none">
           <div className="task-content flex items-center gap-2 flex-1 truncate">
