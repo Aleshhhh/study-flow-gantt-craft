@@ -29,7 +29,7 @@ export const GanttChart: React.FC = () => {
       id: '1',
       title: 'Sample Study Task',
       description: 'Complete chapter 1 review and practice problems. This involves reading through all the material, taking notes, and working through the exercises at the end of the chapter.',
-      startDate: new Date(2025, 5, 15), // Updated to a more relevant date
+      startDate: new Date(2025, 5, 15),
       endDate: new Date(2025, 5, 20),
       color: '#6b7280',
       milestones: ['Review notes', 'Practice problems'],
@@ -65,6 +65,15 @@ export const GanttChart: React.FC = () => {
   const visibleDays = 60;
   const bufferDays = 30;
   const daysToNavigate = 30;
+
+  // Reset states when switching to Gantt view
+  useEffect(() => {
+    if (viewMode === 'gantt') {
+      setIsDragging(false);
+      setIsTaskBeingDragged(false);
+      setNewTaskPreview(null);
+    }
+  }, [viewMode]);
 
   // --- LOGICA DI GENERAZIONE TIMELINE ---
   const generateDynamicTimeline = useCallback(() => {
@@ -149,10 +158,14 @@ export const GanttChart: React.FC = () => {
   }, [isLoading]);
 
   const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    setScrollOffset(e.currentTarget.scrollLeft);
+    if (viewMode === 'gantt') {
+      setScrollOffset(e.currentTarget.scrollLeft);
+    }
   };
   
   useEffect(() => {
+    if (viewMode !== 'gantt') return;
+    
     if (timelineRef.current) timelineRef.current.scrollLeft = scrollOffset;
     if (headerRef.current) headerRef.current.scrollLeft = scrollOffset;
 
@@ -169,26 +182,28 @@ export const GanttChart: React.FC = () => {
         navigateDate('prev');
       }
     }
-  }, [scrollOffset, isLoading, navigateDate]);
+  }, [scrollOffset, isLoading, navigateDate, viewMode]);
 
   useLayoutEffect(() => {
-    if (isLoading) {
-        const chartEl = chartRef.current;
-        if (chartEl && lastNavDirection.current) {
-            const pixelsMoved = daysToNavigate * dayWidth;
-            if (lastNavDirection.current === 'prev') {
-                chartEl.scrollLeft += pixelsMoved;
-            } else {
-                chartEl.scrollLeft -= pixelsMoved;
-            }
-            setScrollOffset(chartEl.scrollLeft);
+    if (viewMode !== 'gantt' || !isLoading) return;
+    
+    const chartEl = chartRef.current;
+    if (chartEl && lastNavDirection.current) {
+        const pixelsMoved = daysToNavigate * dayWidth;
+        if (lastNavDirection.current === 'prev') {
+            chartEl.scrollLeft += pixelsMoved;
+        } else {
+            chartEl.scrollLeft -= pixelsMoved;
         }
-        setIsLoading(false);
-        lastNavDirection.current = null;
+        setScrollOffset(chartEl.scrollLeft);
     }
-  }, [timeline, isLoading]);
+    setIsLoading(false);
+    lastNavDirection.current = null;
+  }, [timeline, isLoading, viewMode]);
 
   useEffect(() => {
+    if (viewMode !== 'gantt') return;
+    
     const wheelTarget = chartRef.current;
     if (!wheelTarget) return;
 
@@ -199,11 +214,11 @@ export const GanttChart: React.FC = () => {
 
     wheelTarget.addEventListener('wheel', handleWheel, { passive: false });
     return () => wheelTarget.removeEventListener('wheel', handleWheel);
-  }, []);
+  }, [viewMode]);
 
   // --- LOGICA DRAG & DROP ---
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (viewMode === 'kanban' || e.button !== 0 || isTaskBeingDragged) return;
+    if (viewMode !== 'gantt' || e.button !== 0 || isTaskBeingDragged) return;
     const target = e.target as HTMLElement;
     if (target.closest('.task-bar')) return;
 
@@ -221,7 +236,7 @@ export const GanttChart: React.FC = () => {
     }
   };
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (viewMode === 'kanban' || !isDragging || !newTaskPreview || !chartRef.current || isTaskBeingDragged) return;
+    if (viewMode !== 'gantt' || !isDragging || !newTaskPreview || !chartRef.current || isTaskBeingDragged) return;
     const rect = chartRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left + scrollOffset;
     const dayIndex = Math.max(0, Math.floor(x / dayWidth));
@@ -229,7 +244,7 @@ export const GanttChart: React.FC = () => {
     setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
   };
   const handleMouseUp = () => {
-    if (viewMode === 'kanban' || !isDragging || !newTaskPreview || isTaskBeingDragged) return;
+    if (viewMode !== 'gantt' || !isDragging || !newTaskPreview || isTaskBeingDragged) return;
     const { startDate, endDate } = newTaskPreview;
     if (startDate.getTime() === endDate.getTime()) {
          setIsDragging(false);
@@ -433,7 +448,7 @@ export const GanttChart: React.FC = () => {
                onMouseDown={handleMouseDown}
                onMouseMove={handleMouseMove}
                onMouseUp={handleMouseUp}
-               onMouseLeave={handleMouseUp}> {/* End drag if mouse leaves area */}
+               onMouseLeave={handleMouseUp}>
             
             <div className="relative w-full h-full">
                  {/* Vertical Grid Lines */}
@@ -442,10 +457,10 @@ export const GanttChart: React.FC = () => {
                          const isWeekStart = date.getDay() === 0;
                          const isMonthStart = date.getDate() === 1;
                          return (
-                             <React.Fragment key={`line-${index}`}>
+                             <div key={`line-${index}`}>
                                  {isWeekStart && <div className="absolute top-0 bottom-0 w-px bg-border/20" style={{ left: `${index * dayWidth}px` }} />}
                                  {isMonthStart && <div className="absolute top-0 bottom-0 w-0.5 bg-border/40" style={{ left: `${index * dayWidth}px` }} />}
-                             </React.Fragment>
+                             </div>
                          );
                      })}
                  </div>
