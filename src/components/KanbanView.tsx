@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Plus, GripVertical, Trash2, Move } from 'lucide-react';
+import { Plus, GripVertical, Trash2 } from 'lucide-react';
 import type { Task, KanbanColumn } from '@/types/gantt';
 
 interface KanbanViewProps {
@@ -25,8 +25,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
-  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
-  const [draggedOverColumnIndex, setDraggedOverColumnIndex] = useState<number | null>(null);
 
   // Group tasks by status
   const getTasksByStatus = (status: string) => {
@@ -44,20 +42,20 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     return Math.round((columnIndex / (totalColumns - 1)) * 100);
   };
 
-  const handleTaskDragStart = (taskId: string) => {
+  const handleDragStart = (taskId: string) => {
     setDraggedTask(taskId);
   };
 
-  const handleTaskDragOver = (e: React.DragEvent, columnId: string) => {
+  const handleDragOver = (e: React.DragEvent, columnId: string) => {
     e.preventDefault();
     setDraggedOverColumn(columnId);
   };
 
-  const handleTaskDragLeave = () => {
+  const handleDragLeave = () => {
     setDraggedOverColumn(null);
   };
 
-  const handleTaskDrop = (e: React.DragEvent, columnId: string) => {
+  const handleDrop = (e: React.DragEvent, columnId: string) => {
     e.preventDefault();
     if (draggedTask) {
       const column = columns.find(col => col.id === columnId);
@@ -67,44 +65,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     }
     setDraggedTask(null);
     setDraggedOverColumn(null);
-  };
-
-  // Column drag handlers
-  const handleColumnDragStart = (e: React.DragEvent, columnId: string) => {
-    e.stopPropagation();
-    setDraggedColumn(columnId);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleColumnDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (draggedColumn) {
-      setDraggedOverColumnIndex(index);
-    }
-  };
-
-  const handleColumnDragLeave = (e: React.DragEvent) => {
-    e.stopPropagation();
-    setDraggedOverColumnIndex(null);
-  };
-
-  const handleColumnDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (draggedColumn) {
-      const draggedColumnIndex = columns.findIndex(col => col.id === draggedColumn);
-      if (draggedColumnIndex !== -1 && draggedColumnIndex !== dropIndex) {
-        const newColumns = [...columns];
-        const [movedColumn] = newColumns.splice(draggedColumnIndex, 1);
-        newColumns.splice(dropIndex, 0, movedColumn);
-        setColumns(newColumns);
-      }
-    }
-    
-    setDraggedColumn(null);
-    setDraggedOverColumnIndex(null);
   };
 
   const addColumn = () => {
@@ -148,46 +108,22 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full">
         {/* Mobile: Horizontal scroll, Desktop: Normal flex */}
         <div className="flex lg:contents gap-4 lg:gap-6 overflow-x-auto lg:overflow-x-visible pb-4 lg:pb-0">
-          {columns.map((column, index) => {
+          {columns.map((column) => {
             const columnTasks = getTasksByStatus(column.title);
-            const isTaskDraggedOver = draggedOverColumn === column.id;
-            const isColumnDraggedOver = draggedOverColumnIndex === index;
-            const isBeingDragged = draggedColumn === column.id;
+            const isDraggedOver = draggedOverColumn === column.id;
             
             return (
               <div
                 key={column.id}
                 className={`flex-shrink-0 w-80 sm:w-96 lg:flex-1 lg:min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-300 ${
-                  isTaskDraggedOver ? 'border-primary bg-primary/5 scale-102' : ''
-                } ${isColumnDraggedOver ? 'border-blue-500 bg-blue-50' : ''} ${
-                  isBeingDragged ? 'opacity-50' : ''
+                  isDraggedOver ? 'border-primary bg-primary/5 scale-102' : ''
                 }`}
-                onDragOver={(e) => {
-                  handleTaskDragOver(e, column.id);
-                  if (draggedColumn) handleColumnDragOver(e, index);
-                }}
-                onDragLeave={(e) => {
-                  handleTaskDragLeave();
-                  if (draggedColumn) handleColumnDragLeave(e);
-                }}
-                onDrop={(e) => {
-                  if (draggedTask) {
-                    handleTaskDrop(e, column.id);
-                  } else if (draggedColumn) {
-                    handleColumnDrop(e, index);
-                  }
-                }}
+                onDragOver={(e) => handleDragOver(e, column.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, column.id)}
               >
                 <div className="p-3 sm:p-4 border-b border-border flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div
-                      draggable
-                      onDragStart={(e) => handleColumnDragStart(e, column.id)}
-                      className="cursor-move p-1 rounded hover:bg-muted/50 transition-colors"
-                      title="Drag to reorder column"
-                    >
-                      <Move className="w-4 h-4 text-muted-foreground" />
-                    </div>
                     <h3 className="font-semibold text-base sm:text-lg">{column.title}</h3>
                     <span className="bg-muted text-muted-foreground rounded-full px-2 py-1 text-xs font-medium">
                       {columnTasks.length}
@@ -213,13 +149,13 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       <div
                         key={task.id}
                         draggable
-                        onDragStart={() => handleTaskDragStart(task.id)}
+                        onDragStart={() => handleDragStart(task.id)}
                         onClick={() => onTaskClick(task)}
                         className="p-3 sm:p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md hover:scale-102 group active:scale-95 touch-manipulation"
                         style={{
                           backgroundColor: task.color,
                           borderColor: task.color,
-                          color: task.textColor || getTextColor(task.color)
+                          color: getTextColor(task.color)
                         }}
                       >
                         <div className="flex items-start justify-between mb-2">
@@ -232,21 +168,19 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </p>
                         )}
                         
-                        {/* Progress Bar with custom color */}
+                        {/* Progress Bar */}
                         <div className="mb-3">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs opacity-70">Progress</span>
                             <span className="text-xs opacity-70">{progress}%</span>
                           </div>
-                          <div className="w-full bg-black/20 rounded-full h-2 overflow-hidden">
-                            <div 
-                              className="h-full rounded-full transition-all duration-300"
-                              style={{
-                                backgroundColor: task.progressBarColor || '#3b82f6',
-                                width: `${progress}%`
-                              }}
-                            />
-                          </div>
+                          <Progress 
+                            value={progress} 
+                            className="h-2 bg-black/20"
+                            style={{
+                              backgroundColor: 'rgba(0,0,0,0.2)'
+                            }}
+                          />
                         </div>
                         
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs opacity-70 gap-1 sm:gap-0">
