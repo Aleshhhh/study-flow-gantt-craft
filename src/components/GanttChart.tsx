@@ -19,9 +19,7 @@ interface MonthGroup {
 type ViewMode = 'gantt' | 'kanban';
 
 export const GanttChart: React.FC = () => {
-  // --- MODIFICA CHIAVE ---
-  // Ora questa costante definisce per quanti anni verrà generato il calendario
-  const numberOfYearsToShow = 10; // Puoi cambiare questo valore (es. 5, 10, 20)
+  const numberOfYearsToShow = 5;
   
   const { theme, toggleTheme } = useTheme();
   const [viewMode, setViewMode] = useState<ViewMode>('gantt');
@@ -49,6 +47,7 @@ export const GanttChart: React.FC = () => {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(new Date());
   const [isDragging, setIsDragging] = useState(false);
   const [newTaskPreview, setNewTaskPreview] = useState<{ startDate: Date; endDate: Date; x: number; y: number } | null>(null);
+  const [currentNavDate, setCurrentNavDate] = useState<Date>(new Date());
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
@@ -56,35 +55,29 @@ export const GanttChart: React.FC = () => {
   
   const dayWidth = 120;
 
-  // --- MODIFICA CHIAVE ---
-  // Funzione che genera l'INTERO timeline per il numero di anni specificato, senza limiti.
-  const generateFullTimeline = () => {
-    console.log(`Generating timeline for ${numberOfYearsToShow} years.`);
+  // Generate timeline based on current navigation date
+  const generateTimeline = () => {
     const timeline = [];
-    // Puoi decidere se partire dalla data odierna o da una data fissa
-    const startDate = new Date(); 
+    const startDate = new Date(currentNavDate);
     startDate.setHours(0, 0, 0, 0);
-
+    
     const endDate = new Date(startDate);
     endDate.setFullYear(startDate.getFullYear() + numberOfYearsToShow);
 
-    let currentDateIterator = new Date(startDate);
-
-    while (currentDateIterator <= endDate) {
-      timeline.push(new Date(currentDateIterator));
-      currentDateIterator.setDate(currentDateIterator.getDate() + 1);
+    let currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+      timeline.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
     }
     
     return timeline;
   };
 
-  // State per contenere il timeline generato. Usiamo useState e useEffect
-  // per generarlo una sola volta e non ad ogni render.
   const [timeline, setTimeline] = useState<Date[]>([]);
+  
   useEffect(() => {
-    setTimeline(generateFullTimeline());
-  }, [numberOfYearsToShow]);
-
+    setTimeline(generateTimeline());
+  }, [currentNavDate, numberOfYearsToShow]);
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -98,7 +91,6 @@ export const GanttChart: React.FC = () => {
     return acc;
   }, {});
 
-  // Il resto della logica per il posizionamento delle task rimane invariato...
   const arrangeTasksInRows = () => {
     const rows: Task[][] = [];
     const sortedTasks = [...tasks].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
@@ -156,34 +148,32 @@ export const GanttChart: React.FC = () => {
     setIsEditModalOpen(true);
   };
   
-  // --- MODIFICA CHIAVE ---
-  // Funzione per sincronizzare lo scroll tra header e chart.
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
     if (headerRef.current) headerRef.current.scrollLeft = scrollLeft;
     if (timelineRef.current) timelineRef.current.scrollLeft = scrollLeft;
-    if (chartRef.current) chartRef.current.scrollLeft = scrollLeft;
   };
   
-  // --- MODIFICA CHIAVE ---
-  // Ora il calendario fa scorrere il grafico fino alla data selezionata.
   const handleCalendarDateSelect = (date: Date | undefined) => {
     setSelectedCalendarDate(date);
     if (date && chartRef.current) {
+      setCurrentNavDate(date);
       const dateIndex = timeline.findIndex(d => d.toDateString() === date.toDateString());
       if (dateIndex !== -1) {
         const scrollPosition = dateIndex * dayWidth - (chartRef.current.clientWidth / 2) + (dayWidth / 2);
         chartRef.current.scrollTo({ left: scrollPosition, behavior: 'smooth' });
       }
     }
-    setIsCalendarOpen(false); // Chiude il calendario dopo la selezione
+    setIsCalendarOpen(false);
   };
 
-  // La logica per il drag-and-drop e il resto dell'UI rimane quasi identica
-  // ma ora opera sul timeline completo.
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Fixed mouse event handlers for drag-to-add functionality
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (viewMode === 'kanban' || e.button !== 0 || !chartRef.current) return;
-    if (e.target === chartRef.current) {
+    
+    // Only start dragging if clicking on the chart background, not on task elements
+    const target = e.target as HTMLElement;
+    if (target === chartRef.current || target.closest('[data-chart-background]')) {
       const rect = chartRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left + chartRef.current.scrollLeft;
       const y = e.clientY - rect.top;
@@ -197,7 +187,7 @@ export const GanttChart: React.FC = () => {
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (viewMode === 'kanban' || !isDragging || !newTaskPreview || !chartRef.current) return;
     
     const rect = chartRef.current.getBoundingClientRect();
@@ -229,58 +219,82 @@ export const GanttChart: React.FC = () => {
     setNewTaskPreview(null);
   };
 
-  // Il resto del JSX è quasi identico, ma i pulsanti di navigazione sono stati rimossi
-  // e l'evento onScroll è stato collegato al contenitore principale.
   if (viewMode === 'kanban') {
-    // La vista Kanban rimane invariata
     return (
+      <>
         <KanbanView 
           tasks={tasks} 
           onTaskUpdate={handleTaskUpdate}
           onTaskClick={handleTaskClick}
+          onAddTask={handleAddTask}
+          onViewModeChange={setViewMode}
+          onSettingsOpen={() => setIsSettingsOpen(true)}
+          onCalendarOpen={() => setIsCalendarOpen(true)}
+          onThemeToggle={toggleTheme}
+          theme={theme}
         />
-        // ... (includi qui tutta la JSX della vista Kanban e i modali, non è necessario cambiarla)
+        
+        {/* Modals */}
+        <TaskEditModal 
+          task={selectedTask} 
+          isOpen={isEditModalOpen}
+          onClose={() => { setIsEditModalOpen(false); setSelectedTask(null); }}
+          onSave={(updates) => { if (selectedTask) { handleTaskUpdate(selectedTask.id, updates); } }}
+          onDelete={(taskId) => { setTasks(prev => prev.filter(task => task.id !== taskId)); setIsEditModalOpen(false); setSelectedTask(null); }}
+        />
+        <SettingsModal 
+          isOpen={isSettingsOpen} 
+          onClose={() => setIsSettingsOpen(false)} 
+          dayColors={dayColors} 
+          onDayColorsChange={setDayColors} 
+        />
+        <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+          <SheetContent side="left" className="w-auto">
+            <SheetHeader><SheetTitle>Go to Date</SheetTitle></SheetHeader>
+            <Calendar mode="single" selected={selectedCalendarDate} onSelect={handleCalendarDateSelect} className="rounded-xl mt-4" />
+          </SheetContent>
+        </Sheet>
+      </>
     );
   }
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Header (i pulsanti di navigazione data sono stati rimossi dal menu) */}
+      {/* Header */}
       <div className="flex items-center justify-between p-2 sm:p-6 border-b border-border bg-card">
         <h1 className="text-base sm:text-2xl font-bold truncate">Study Gantt</h1>
         <div className="flex items-center gap-1 sm:gap-2">
-            {/* Desktop Controls */}
-            <div className="hidden sm:flex items-center gap-3">
-              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-                <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'ghost'} size="sm" className="rounded-md">
-                  <BarChart3 className="w-4 h-4 mr-2" /> Gantt
-                </Button>
-                <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="rounded-md">
-                  <Kanban className="w-4 h-4 mr-2" /> Kanban
-                </Button>
-              </div>
-              <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                    <CalendarIcon className="w-4 h-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-auto">
-                  <SheetHeader><SheetTitle>Go to Date</SheetTitle></SheetHeader>
-                  <Calendar mode="single" selected={selectedCalendarDate} onSelect={handleCalendarDateSelect} className="rounded-xl mt-4" />
-                </SheetContent>
-              </Sheet>
-              <Button onClick={handleAddTask} size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                <Plus className="w-4 h-4 mr-2" /> Add Task
+          {/* Desktop Controls */}
+          <div className="hidden sm:flex items-center gap-3">
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+              <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'ghost'} size="sm" className="rounded-md">
+                <BarChart3 className="w-4 h-4 mr-2" /> Gantt
               </Button>
-              <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                <Settings className="w-4 h-4" />
-              </Button>
-              <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="rounded-md">
+                <Kanban className="w-4 h-4 mr-2" /> Kanban
               </Button>
             </div>
-            {/* Mobile Menu (anche qui rimuovere i pulsanti di navigazione data) */}
+            <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                  <CalendarIcon className="w-4 h-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-auto">
+                <SheetHeader><SheetTitle>Go to Date</SheetTitle></SheetHeader>
+                <Calendar mode="single" selected={selectedCalendarDate} onSelect={handleCalendarDateSelect} className="rounded-xl mt-4" />
+              </SheetContent>
+            </Sheet>
+            <Button onClick={handleAddTask} size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+              <Plus className="w-4 h-4 mr-2" /> Add Task
+            </Button>
+            <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+              <Settings className="w-4 h-4" />
+            </Button>
+            <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+              {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -313,7 +327,7 @@ export const GanttChart: React.FC = () => {
             ))}
           </div>
 
-          {/* Tasks Timeline - Il contenitore principale per lo scrolling */}
+          {/* Tasks Timeline */}
           <div 
             ref={chartRef}
             className="flex-1 overflow-auto relative bg-background"
@@ -321,10 +335,11 @@ export const GanttChart: React.FC = () => {
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
-            onScroll={handleScroll} // Aggiunto l'handler qui
+            onScroll={handleScroll}
+            data-chart-background="true"
           >
             <div className="relative" style={{ width: `${timeline.length * dayWidth}px`, height: `${tasksWithRows.length * 60 + 40}px` }}>
-              {/* Linee di griglia */}
+              {/* Grid lines */}
               {timeline.map((date, index) => {
                 const isMonthStart = date.getDate() === 1;
                 return (
@@ -335,8 +350,13 @@ export const GanttChart: React.FC = () => {
               {/* Task bars */}
               {tasksWithRows.map((task) => (
                 <TaskBar
-                  key={task.id} task={task} timeline={timeline} yPosition={(task as any).rowIndex * 60 + 10}
-                  dayWidth={dayWidth} onUpdate={(updates) => handleTaskUpdate(task.id, updates)}
+                  key={task.id} 
+                  task={task} 
+                  timeline={timeline} 
+                  yPosition={(task as any).rowIndex * 60 + 10}
+                  dayWidth={dayWidth} 
+                  scrollOffset={0}
+                  onUpdate={(updates) => handleTaskUpdate(task.id, updates)}
                   onClick={() => handleTaskClick(task)}
                 />
               ))}
@@ -358,12 +378,19 @@ export const GanttChart: React.FC = () => {
       </div>
 
       {/* Modals */}
-      <TaskEditModal task={selectedTask} isOpen={isEditModalOpen}
+      <TaskEditModal 
+        task={selectedTask} 
+        isOpen={isEditModalOpen}
         onClose={() => { setIsEditModalOpen(false); setSelectedTask(null); }}
         onSave={(updates) => { if (selectedTask) { handleTaskUpdate(selectedTask.id, updates); } }}
         onDelete={(taskId) => { setTasks(prev => prev.filter(task => task.id !== taskId)); setIsEditModalOpen(false); setSelectedTask(null); }}
       />
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} dayColors={dayColors} onDayColorsChange={setDayColors} />
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        dayColors={dayColors} 
+        onDayColorsChange={setDayColors} 
+      />
     </div>
   );
 };
