@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
 import { Plus, GripVertical, Trash2 } from 'lucide-react';
 import type { Task, KanbanColumn } from '@/types/gantt';
 
@@ -26,57 +25,22 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
 
-  // Calculate progress based on column position
-  const calculateProgress = (status: string) => {
-    const columnIndex = columns.findIndex(col => col.title === status);
-    if (columnIndex === -1) return 0;
-    
-    // Progress is based on position in the column array
-    // First column = 0%, last column = 100%, others distributed evenly
-    if (columns.length === 1) return 100;
-    return (columnIndex / (columns.length - 1)) * 100;
-  };
-
   // Group tasks by status
   const getTasksByStatus = (status: string) => {
     return tasks.filter(task => (task.status || 'To Do') === status);
   };
 
-  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+  const handleDragStart = (taskId: string) => {
     setDraggedTask(taskId);
-    e.dataTransfer.effectAllowed = 'move';
-    
-    // Add smooth drag styling
-    const dragImage = e.currentTarget.cloneNode(true) as HTMLElement;
-    dragImage.style.transform = 'rotate(5deg)';
-    dragImage.style.opacity = '0.8';
-    document.body.appendChild(dragImage);
-    e.dataTransfer.setDragImage(dragImage, 0, 0);
-    
-    // Clean up after a short delay
-    setTimeout(() => {
-      if (document.body.contains(dragImage)) {
-        document.body.removeChild(dragImage);
-      }
-    }, 0);
   };
 
   const handleDragOver = (e: React.DragEvent, columnId: string) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
     setDraggedOverColumn(columnId);
   };
 
-  const handleDragEnter = (e: React.DragEvent, columnId: string) => {
-    e.preventDefault();
-    setDraggedOverColumn(columnId);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    // Only clear if we're leaving the column entirely
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setDraggedOverColumn(null);
-    }
+  const handleDragLeave = () => {
+    setDraggedOverColumn(null);
   };
 
   const handleDrop = (e: React.DragEvent, columnId: string) => {
@@ -87,11 +51,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         onTaskUpdate(draggedTask, { status: column.title });
       }
     }
-    setDraggedTask(null);
-    setDraggedOverColumn(null);
-  };
-
-  const handleDragEnd = () => {
     setDraggedTask(null);
     setDraggedOverColumn(null);
   };
@@ -142,13 +101,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
           return (
             <div
               key={column.id}
-              className={`flex-1 min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-300 ease-in-out ${
-                isDraggedOver 
-                  ? 'border-primary bg-primary/5 scale-102 shadow-lg' 
-                  : 'border-border hover:shadow-md'
+              className={`flex-1 min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-300 ${
+                isDraggedOver ? 'border-primary bg-primary/5 scale-102' : ''
               }`}
               onDragOver={(e) => handleDragOver(e, column.id)}
-              onDragEnter={(e) => handleDragEnter(e, column.id)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, column.id)}
             >
@@ -164,7 +120,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     onClick={() => deleteColumn(column.id)}
                     variant="ghost"
                     size="sm"
-                    className="text-muted-foreground hover:text-destructive transition-colors duration-200"
+                    className="text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -172,72 +128,45 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
               </div>
               
               <div className="p-4 space-y-3 min-h-96">
-                {columnTasks.map((task) => {
-                  const progress = calculateProgress(task.status || 'To Do');
-                  const isDragging = draggedTask === task.id;
-                  
-                  return (
-                    <div
-                      key={task.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, task.id)}
-                      onDragEnd={handleDragEnd}
-                      onClick={() => onTaskClick(task)}
-                      className={`p-4 rounded-xl shadow-sm border cursor-grab active:cursor-grabbing transition-all duration-300 ease-out group ${
-                        isDragging 
-                          ? 'opacity-50 scale-95 rotate-2' 
-                          : 'hover:shadow-lg hover:scale-102 hover:-translate-y-1'
-                      }`}
-                      style={{
-                        backgroundColor: task.color,
-                        borderColor: task.color,
-                        color: getTextColor(task.color),
-                        transform: isDragging ? 'scale(0.95) rotate(2deg)' : undefined
-                      }}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
-                        <GripVertical className={`w-4 h-4 transition-all duration-300 ${
-                          isDragging ? 'opacity-100' : 'opacity-50 group-hover:opacity-100'
-                        }`} />
-                      </div>
-                      
-                      {task.description && (
-                        <p className="text-xs opacity-80 line-clamp-2 mb-3">
-                          {task.description}
-                        </p>
-                      )}
-                      
-                      {/* Progress Bar */}
-                      <div className="mb-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs opacity-70">Progress</span>
-                          <span className="text-xs opacity-70">{Math.round(progress)}%</span>
-                        </div>
-                        <Progress 
-                          value={progress} 
-                          className="h-2 bg-black/20 transition-all duration-500 ease-out"
-                        />
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-xs opacity-70">
-                        <span>
-                          {task.startDate.toLocaleDateString()} - {task.endDate.toLocaleDateString()}
-                        </span>
-                        {task.milestones.length > 0 && (
-                          <span>{task.milestones.length} milestones</span>
-                        )}
-                      </div>
+                {columnTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    draggable
+                    onDragStart={() => handleDragStart(task.id)}
+                    onClick={() => onTaskClick(task)}
+                    className="p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md hover:scale-102 group"
+                    style={{
+                      backgroundColor: task.color,
+                      borderColor: task.color,
+                      color: getTextColor(task.color)
+                    }}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
+                      <GripVertical className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
                     </div>
-                  );
-                })}
+                    {task.description && (
+                      <p className="text-xs opacity-80 line-clamp-2 mb-3">
+                        {task.description}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between text-xs opacity-70">
+                      <span>
+                        {task.startDate.toLocaleDateString()} - {task.endDate.toLocaleDateString()}
+                      </span>
+                      {task.milestones.length > 0 && (
+                        <span>{task.milestones.length} milestones</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           );
         })}
         
         {/* Add Column */}
-        <div className="w-80 bg-card rounded-xl shadow-sm border border-dashed border-muted-foreground/30 transition-all duration-300 hover:border-muted-foreground/50 hover:shadow-md">
+        <div className="w-80 bg-card rounded-xl shadow-sm border border-dashed border-muted-foreground/30">
           <div className="p-4">
             <div className="space-y-3">
               <Input
@@ -245,12 +174,12 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 value={newColumnTitle}
                 onChange={(e) => setNewColumnTitle(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addColumn()}
-                className="rounded-xl transition-all duration-200 focus:scale-102"
+                className="rounded-xl"
               />
               <Button
                 onClick={addColumn}
                 variant="outline"
-                className="w-full rounded-xl transition-all duration-300 hover:scale-105 active:scale-95"
+                className="w-full rounded-xl transition-all duration-300 hover:scale-105"
                 disabled={!newColumnTitle.trim()}
               >
                 <Plus className="w-4 h-4 mr-2" />

@@ -1,6 +1,6 @@
 
+import { GanttChart } from "@/components/GanttChart";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import GanttChart from "@/components/GanttChart";
 
 const Index = () => {
   return (
