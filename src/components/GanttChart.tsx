@@ -31,7 +31,7 @@ export const GanttChart: React.FC = () => {
       description: 'Complete chapter 1 review and practice problems. This involves reading through all the material, taking notes, and working through the exercises at the end of the chapter.',
       startDate: new Date(2025, 5, 15),
       endDate: new Date(2025, 5, 20),
-      color: '#f97316', // Orange color for better visibility
+      color: '#6b7280',
       milestones: ['Review notes', 'Practice problems'],
       status: 'To Do'
     }
@@ -42,13 +42,8 @@ export const GanttChart: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [dayColors, setDayColors] = useState<DayColors>({
-    0: theme === 'dark' ? '#1f2937' : '#f9fafb', // Sunday
-    1: theme === 'dark' ? '#111827' : '#ffffff', // Monday  
-    2: theme === 'dark' ? '#111827' : '#ffffff', // Tuesday
-    3: theme === 'dark' ? '#111827' : '#ffffff', // Wednesday
-    4: theme === 'dark' ? '#111827' : '#ffffff', // Thursday
-    5: theme === 'dark' ? '#111827' : '#ffffff', // Friday
-    6: theme === 'dark' ? '#374151' : '#f3f4f6'  // Saturday
+    0: '#f3f4f6', 1: '#ffffff', 2: '#ffffff', 3: '#ffffff',
+    4: '#ffffff', 5: '#ffffff', 6: '#f9fafb'
   });
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(new Date());
@@ -59,7 +54,6 @@ export const GanttChart: React.FC = () => {
   // --- STATE E REFS PER LA TIMELINE INFINITA ---
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [savedScrollPosition, setSavedScrollPosition] = useState(0);
   const lastNavDirection = useRef<'prev' | 'next' | null>(null);
 
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -72,40 +66,14 @@ export const GanttChart: React.FC = () => {
   const bufferDays = 30;
   const daysToNavigate = 30;
 
-  // Update day colors when theme changes
-  useEffect(() => {
-    setDayColors({
-      0: theme === 'dark' ? '#1f2937' : '#f9fafb', // Sunday
-      1: theme === 'dark' ? '#111827' : '#ffffff', // Monday  
-      2: theme === 'dark' ? '#111827' : '#ffffff', // Tuesday
-      3: theme === 'dark' ? '#111827' : '#ffffff', // Wednesday
-      4: theme === 'dark' ? '#111827' : '#ffffff', // Thursday
-      5: theme === 'dark' ? '#111827' : '#ffffff', // Friday
-      6: theme === 'dark' ? '#374151' : '#f3f4f6'  // Saturday
-    });
-  }, [theme]);
-
-  // Reset states when switching views and save/restore scroll position
+  // Reset states when switching to Gantt view
   useEffect(() => {
     if (viewMode === 'gantt') {
       setIsDragging(false);
       setIsTaskBeingDragged(false);
       setNewTaskPreview(null);
-      
-      // Restore scroll position after a brief delay
-      setTimeout(() => {
-        if (chartRef.current) {
-          chartRef.current.scrollLeft = savedScrollPosition;
-          setScrollOffset(savedScrollPosition);
-        }
-      }, 100);
-    } else {
-      // Save current scroll position when leaving Gantt view
-      if (chartRef.current) {
-        setSavedScrollPosition(chartRef.current.scrollLeft);
-      }
     }
-  }, [viewMode, savedScrollPosition]);
+  }, [viewMode]);
 
   // --- LOGICA DI GENERAZIONE TIMELINE ---
   const generateDynamicTimeline = useCallback(() => {
@@ -121,7 +89,7 @@ export const GanttChart: React.FC = () => {
       timeline.push(date);
     }
     return timeline;
-  }, [currentDate, visibleDays, bufferDays]);
+  }, [currentDate]);
 
   const timeline = generateDynamicTimeline();
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -135,16 +103,6 @@ export const GanttChart: React.FC = () => {
     acc[monthKey].count++;
     return acc;
   }, {});
-
-  // Get current visible month based on scroll position
-  const getCurrentVisibleMonth = () => {
-    const visibleDayIndex = Math.floor(scrollOffset / dayWidth);
-    const visibleDate = timeline[visibleDayIndex];
-    if (visibleDate) {
-      return `${monthNames[visibleDate.getMonth()]} ${visibleDate.getFullYear()}`;
-    }
-    return '';
-  };
 
   // --- LOGICA DI GESTIONE TASK ---
   const arrangeTasksInRows = () => {
@@ -180,8 +138,7 @@ export const GanttChart: React.FC = () => {
       id: Date.now().toString(), title: 'New Task', description: '',
       startDate: centerDate,
       endDate: new Date(centerDate.getTime() + 5 * 24 * 60 * 60 * 1000),
-      color: '#f59e0b', // Amber color for new tasks
-      milestones: [], status: 'To Do'
+      color: '#6b7280', milestones: [], status: 'To Do'
     };
     setTasks(prev => [...prev, newTask]);
     setSelectedTask(newTask);
@@ -198,13 +155,11 @@ export const GanttChart: React.FC = () => {
       newDate.setDate(newDate.getDate() + (direction === 'next' ? daysToNavigate : -daysToNavigate));
       return newDate;
     });
-  }, [isLoading, daysToNavigate]);
+  }, [isLoading]);
 
   const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (viewMode === 'gantt') {
-      const newScrollOffset = e.currentTarget.scrollLeft;
-      setScrollOffset(newScrollOffset);
-      setSavedScrollPosition(newScrollOffset);
+      setScrollOffset(e.currentTarget.scrollLeft);
     }
   };
   
@@ -227,7 +182,7 @@ export const GanttChart: React.FC = () => {
         navigateDate('prev');
       }
     }
-  }, [scrollOffset, isLoading, navigateDate, viewMode, dayWidth]);
+  }, [scrollOffset, isLoading, navigateDate, viewMode]);
 
   useLayoutEffect(() => {
     if (viewMode !== 'gantt' || !isLoading) return;
@@ -241,11 +196,10 @@ export const GanttChart: React.FC = () => {
             chartEl.scrollLeft -= pixelsMoved;
         }
         setScrollOffset(chartEl.scrollLeft);
-        setSavedScrollPosition(chartEl.scrollLeft);
     }
     setIsLoading(false);
     lastNavDirection.current = null;
-  }, [timeline, isLoading, viewMode, daysToNavigate, dayWidth]);
+  }, [timeline, isLoading, viewMode]);
 
   useEffect(() => {
     if (viewMode !== 'gantt') return;
@@ -302,8 +256,7 @@ export const GanttChart: React.FC = () => {
       id: Date.now().toString(), title: 'New Task', description: '',
       startDate: startDate < endDate ? startDate : endDate,
       endDate: startDate < endDate ? endDate : startDate,
-      color: '#f59e0b', // Amber color for dragged tasks
-      milestones: [], status: 'To Do'
+      color: '#6b7280', milestones: [], status: 'To Do'
     };
     setTasks(prev => [...prev, newTask]);
     setSelectedTask(newTask);
@@ -396,13 +349,7 @@ export const GanttChart: React.FC = () => {
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
       <div className="flex items-center justify-between p-2 sm:p-6 border-b border-border bg-card">
-         <div className="flex items-center gap-4">
-           <h1 className="text-base sm:text-2xl font-bold truncate">Study Gantt</h1>
-           {/* Current Month Indicator */}
-           <div className="hidden sm:block px-3 py-1 bg-muted rounded-lg text-sm font-medium">
-             {getCurrentVisibleMonth()}
-           </div>
-         </div>
+         <h1 className="text-base sm:text-2xl font-bold truncate">Study Gantt</h1>
          <div className="flex items-center gap-1 sm:gap-2">
             {/* Controlli Mobile */}
              <div className="sm:hidden">
@@ -483,7 +430,7 @@ export const GanttChart: React.FC = () => {
               return (
                 <div key={index} className={`relative border-r border-border p-1 sm:p-4 text-center text-xs sm:text-sm transition-colors duration-200 ${isSelectedDate ? 'bg-primary/20' : ''}`}
                      style={{ 
-                       backgroundColor: isSelectedDate ? undefined : dayColors[date.getDay()],
+                       backgroundColor: isSelectedDate ? undefined : (theme === 'dark' ? (dayColors[date.getDay()] === '#ffffff' ? '#1f2937' : '#374151') : dayColors[date.getDay()]),
                        minWidth: `${dayWidth}px` 
                      }}>
                   {isMonthStart && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary/30 rounded-full" />}
