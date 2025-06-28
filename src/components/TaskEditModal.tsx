@@ -30,8 +30,6 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
     startDate: '',
     endDate: '',
     color: '#6b7280',
-    textColor: '',
-    progressBarColor: '',
     milestones: [] as string[]
   });
   const [newMilestone, setNewMilestone] = useState('');
@@ -44,8 +42,6 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
         startDate: task.startDate.toISOString().split('T')[0],
         endDate: task.endDate.toISOString().split('T')[0],
         color: task.color,
-        textColor: task.textColor || '',
-        progressBarColor: task.progressBarColor || '',
         milestones: [...task.milestones]
       });
     }
@@ -59,8 +55,6 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
         startDate: new Date(formData.startDate),
         endDate: new Date(formData.endDate),
         color: formData.color,
-        textColor: formData.textColor || undefined,
-        progressBarColor: formData.progressBarColor || undefined,
         milestones: formData.milestones
       });
       onClose();
@@ -153,10 +147,10 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
             </div>
           </div>
 
-          {/* Task Background Color */}
+          {/* Color */}
           <div className="space-y-2">
-            <Label>Task Background Color</Label>
-            <div className="flex flex-wrap gap-2 mb-2">
+            <Label>Task Color</Label>
+            <div className="flex flex-wrap gap-2">
               {colorOptions.map(color => (
                 <button
                   key={color}
@@ -168,58 +162,6 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
                 />
               ))}
             </div>
-            <Input
-              value={formData.color}
-              onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-              placeholder="#000000"
-              className="w-32"
-            />
-          </div>
-
-          {/* Text Color */}
-          <div className="space-y-2">
-            <Label>Text Color (Optional)</Label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {['#ffffff', '#000000', '#6b7280', '#dc2626', '#16a34a', '#2563eb'].map(color => (
-                <button
-                  key={color}
-                  className={`w-8 h-8 rounded border-2 ${
-                    formData.textColor === color ? 'border-foreground' : 'border-border'
-                  }`}
-                  style={{ backgroundColor: color }}
-                  onClick={() => setFormData(prev => ({ ...prev, textColor: color }))}
-                />
-              ))}
-            </div>
-            <Input
-              value={formData.textColor}
-              onChange={(e) => setFormData(prev => ({ ...prev, textColor: e.target.value }))}
-              placeholder="#ffffff (leave empty for auto)"
-              className="w-64"
-            />
-          </div>
-
-          {/* Progress Bar Color */}
-          <div className="space-y-2">
-            <Label>Progress Bar Color (Optional)</Label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'].map(color => (
-                <button
-                  key={color}
-                  className={`w-8 h-8 rounded border-2 ${
-                    formData.progressBarColor === color ? 'border-foreground' : 'border-border'
-                  }`}
-                  style={{ backgroundColor: color }}
-                  onClick={() => setFormData(prev => ({ ...prev, progressBarColor: color }))}
-                />
-              ))}
-            </div>
-            <Input
-              value={formData.progressBarColor}
-              onChange={(e) => setFormData(prev => ({ ...prev, progressBarColor: e.target.value }))}
-              placeholder="#22c55e (leave empty for default)"
-              className="w-64"
-            />
           </div>
 
           {/* Milestones */}

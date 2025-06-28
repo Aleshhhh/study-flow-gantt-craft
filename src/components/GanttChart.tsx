@@ -1,318 +1,565 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Progress } from "@/components/ui/progress"
-import { cn } from "@/lib/utils"
-import { format } from "date-fns"
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar as CalendarIcon } from "lucide-react"
-import { DateRange } from "react-day-picker"
+import { Calendar } from '@/components/ui/calendar';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { TaskBar } from './TaskBar';
+import { TaskEditModal } from './TaskEditModal';
+import { SettingsModal } from './SettingsModal';
+import { useTheme } from './ThemeProvider';
+import { Moon, Sun, Settings, Plus, BarChart3, Kanban, Calendar as CalendarIcon, Menu } from 'lucide-react';
 import type { Task, DayColors } from '@/types/gantt';
 import { KanbanView } from './KanbanView';
 
-interface GanttChartProps {
-  tasks: Task[];
-  onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
-  onTaskClick: (task: Task) => void;
-  dayColors?: DayColors;
-  view?: 'gantt' | 'kanban';
+// --- TIPI E INTERFACCE ---
+interface MonthGroup {
+  month: string;
+  year: string;
+  count: number;
 }
+type ViewMode = 'gantt' | 'kanban';
 
-export const GanttChart: React.FC<GanttChartProps> = ({
-  tasks,
-  onTaskUpdate,
-  onTaskClick,
-  dayColors = {},
-  view = 'gantt'
-}) => {
-  const [startDate, setStartDate] = useState<Date>(new Date());
-  const [endDate, setEndDate] = useState<Date>(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)); // 30 days from now
-  const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const [draggedTask, setDraggedTask] = useState<string | null>(null);
-  const [dragStart, setDragStart] = useState<Date | null>(null);
-  const [columnWidth, setColumnWidth] = useState(50);
-  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
-    from: startDate,
-    to: endDate,
-  })
+// --- COMPONENTE GANTT CHART MODIFICATO ---
+export const GanttChart: React.FC = () => {
+  const { theme, toggleTheme } = useTheme();
+  const [viewMode, setViewMode] = useState<ViewMode>('gantt');
+  
+  const [tasks, setTasks] = useState<Task[]>([
+    {
+      id: '1',
+      title: 'Sample Study Task',
+      description: 'Complete chapter 1 review and practice problems. This involves reading through all the material, taking notes, and working through the exercises at the end of the chapter.',
+      startDate: new Date(2025, 5, 15),
+      endDate: new Date(2025, 5, 20),
+      color: '#f5f5dc',
+      milestones: ['Review notes', 'Practice problems'],
+      status: 'To Do'
+    }
+  ]);
+  
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [dayColors, setDayColors] = useState<DayColors>({
+    0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
+    1: theme === 'dark' ? '#020617' : '#ffffff', 
+    2: theme === 'dark' ? '#020617' : '#ffffff', 
+    3: theme === 'dark' ? '#020617' : '#ffffff',
+    4: theme === 'dark' ? '#020617' : '#ffffff', 
+    5: theme === 'dark' ? '#020617' : '#ffffff', 
+    6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
+  });
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(new Date());
+  const [isDragging, setIsDragging] = useState(false);
+  const [isTaskBeingDragged, setIsTaskBeingDragged] = useState(false);
+  const [newTaskPreview, setNewTaskPreview] = useState<{ startDate: Date; endDate: Date; x: number; y: number } | null>(null);
+  
+  // --- STATE E REFS PER LA TIMELINE INFINITA ---
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [savedScrollPositions, setSavedScrollPositions] = useState<{ [key in ViewMode]?: number }>({});
+  const lastNavDirection = useRef<'prev' | 'next' | null>(null);
+
+  const timelineRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Configurazione per la virtualizzazione
+  const dayWidth = 120;
+  const visibleDays = 60;
+  const bufferDays = 30;
+  const daysToNavigate = 30;
+
+  // Update day colors when theme changes
+  useEffect(() => {
+    setDayColors({
+      0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
+      1: theme === 'dark' ? '#020617' : '#ffffff', 
+      2: theme === 'dark' ? '#020617' : '#ffffff', 
+      3: theme === 'dark' ? '#020617' : '#ffffff',
+      4: theme === 'dark' ? '#020617' : '#ffffff', 
+      5: theme === 'dark' ? '#020617' : '#ffffff', 
+      6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
+    });
+  }, [theme]);
+
+  // Reset states when switching to Gantt view and restore scroll position
+  useEffect(() => {
+    if (viewMode === 'gantt') {
+      setIsDragging(false);
+      setIsTaskBeingDragged(false);
+      setNewTaskPreview(null);
+      
+      // Restore scroll position after a short delay to ensure DOM is ready
+      setTimeout(() => {
+        if (savedScrollPositions.gantt !== undefined && chartRef.current) {
+          chartRef.current.scrollLeft = savedScrollPositions.gantt;
+          setScrollOffset(savedScrollPositions.gantt);
+        }
+      }, 50);
+    } else if (viewMode === 'kanban') {
+      // Save current scroll position when leaving Gantt view
+      setSavedScrollPositions(prev => ({
+        ...prev,
+        gantt: scrollOffset
+      }));
+    }
+  }, [viewMode]);
+
+  // Save scroll position when leaving Gantt view
+  useEffect(() => {
+    return () => {
+      if (viewMode === 'gantt') {
+        setSavedScrollPositions(prev => ({
+          ...prev,
+          gantt: scrollOffset
+        }));
+      }
+    };
+  }, [scrollOffset, viewMode]);
+
+  // --- LOGICA DI GENERAZIONE TIMELINE ---
+  const generateDynamicTimeline = useCallback(() => {
+    const timeline = [];
+    const baseDate = new Date(currentDate);
+    const startDate = new Date(baseDate);
+    startDate.setDate(baseDate.getDate() - Math.floor(visibleDays / 2));
+    startDate.setHours(0, 0, 0, 0);
+    const totalDays = visibleDays + bufferDays * 2;
+    for (let i = 0; i < totalDays; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      timeline.push(date);
+    }
+    return timeline;
+  }, [currentDate, visibleDays, bufferDays]);
+
+  const timeline = generateDynamicTimeline();
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const monthGroups: Record<string, MonthGroup> = timeline.reduce((acc: Record<string, MonthGroup>, date) => {
+    const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+    if (!acc[monthKey]) {
+      acc[monthKey] = { month: monthNames[date.getMonth()], year: date.getFullYear().toString(), count: 0 };
+    }
+    acc[monthKey].count++;
+    return acc;
+  }, {});
+
+  // Get current visible month based on scroll position
+  const getCurrentVisibleMonth = () => {
+    const currentDayIndex = Math.floor(scrollOffset / dayWidth);
+    const currentVisibleDate = timeline[currentDayIndex] || timeline[0];
+    return `${monthNames[currentVisibleDate.getMonth()]} ${currentVisibleDate.getFullYear()}`;
+  };
+
+  // --- LOGICA DI GESTIONE TASK ---
+  const arrangeTasksInRows = () => {
+    const rows: Task[][] = [];
+    const sortedTasks = [...tasks].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+    for (const task of sortedTasks) {
+      let placed = false;
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const hasOverlap = row.some(existingTask => (task.startDate <= existingTask.endDate && task.endDate >= existingTask.startDate));
+        if (!hasOverlap) {
+          row.push(task);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) rows.push([task]);
+    }
+    return rows.flat().map((task) => ({ ...task, rowIndex: rows.findIndex(row => row.includes(task)) }));
+  };
+  const tasksWithRows = arrangeTasksInRows();
+
+  const handleTaskUpdate = (taskId: string, updates: Partial<Task>) => {
+    setTasks(prev => prev.map(task => task.id === taskId ? { ...task, ...updates } : task));
+  };
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setIsEditModalOpen(true);
+  };
+  const handleAddTask = () => {
+    const centerDate = timeline[Math.floor(timeline.length / 2)];
+    const newTask: Task = {
+      id: Date.now().toString(), title: 'New Task', description: '',
+      startDate: centerDate,
+      endDate: new Date(centerDate.getTime() + 5 * 24 * 60 * 60 * 1000),
+      color: '#f5f5dc', milestones: [], status: 'To Do'
+    };
+    setTasks(prev => [...prev, newTask]);
+    setSelectedTask(newTask);
+    setIsEditModalOpen(true);
+  };
+  
+  // --- LOGICA DI NAVIGAZIONE E SCROLL INFINITO ---
+  const navigateDate = useCallback((direction: 'prev' | 'next') => {
+    if (isLoading) return;
+    setIsLoading(true);
+    lastNavDirection.current = direction;
+    setCurrentDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() + (direction === 'next' ? daysToNavigate : -daysToNavigate));
+      return newDate;
+    });
+  }, [isLoading, daysToNavigate]);
+
+  const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const newScrollOffset = e.currentTarget.scrollLeft;
+    setScrollOffset(newScrollOffset);
+  };
+  
+  useEffect(() => {
+    if (viewMode !== 'gantt') return;
+    
+    if (timelineRef.current) timelineRef.current.scrollLeft = scrollOffset;
+    if (headerRef.current) headerRef.current.scrollLeft = scrollOffset;
+
+    const chartEl = chartRef.current;
+    if (!chartEl || isLoading) return;
+
+    const { clientWidth, scrollWidth } = chartEl;
+    const threshold = dayWidth * 15;
+
+    if (scrollWidth > clientWidth) {
+      if (scrollWidth - (scrollOffset + clientWidth) < threshold) {
+        navigateDate('next');
+      } else if (scrollOffset < threshold) {
+        navigateDate('prev');
+      }
+    }
+  }, [scrollOffset, isLoading, navigateDate, viewMode, dayWidth]);
+
+  useLayoutEffect(() => {
+    if (viewMode !== 'gantt' || !isLoading) return;
+    
+    const chartEl = chartRef.current;
+    if (chartEl && lastNavDirection.current) {
+        const pixelsMoved = daysToNavigate * dayWidth;
+        if (lastNavDirection.current === 'prev') {
+            chartEl.scrollLeft += pixelsMoved;
+        } else {
+            chartEl.scrollLeft -= pixelsMoved;
+        }
+        setScrollOffset(chartEl.scrollLeft);
+    }
+    setIsLoading(false);
+    lastNavDirection.current = null;
+  }, [timeline, isLoading, viewMode, daysToNavigate, dayWidth]);
 
   useEffect(() => {
-    setDateRange({ from: startDate, to: endDate });
-  }, [startDate, endDate]);
-
-  useEffect(() => {
-    if (dateRange?.from) setStartDate(dateRange.from);
-    if (dateRange?.to) setEndDate(dateRange.to);
-  }, [dateRange?.from, dateRange?.to]);
-
-  const daysInRange = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-
-  const getDayColor = (date: Date): string | undefined => {
-    const dayIndex = date.getDay();
-    return dayColors[dayIndex];
-  };
-
-  const isWeekend = (date: Date): boolean => {
-    const dayIndex = date.getDay();
-    return dayIndex === 0 || dayIndex === 6; // Sunday or Saturday
-  };
-
-  const generateDates = (): Date[] => {
-    const dates: Date[] = [];
-    let currentDate = new Date(startDate);
-    while (currentDate <= endDate) {
-      dates.push(new Date(currentDate));
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-    return dates;
-  };
-
-  const formatDate = (date: Date): string => {
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  };
-
-  const getTaskPosition = (task: Task): number => {
-    const taskStart = task.startDate.getTime();
-    const chartStart = startDate.getTime();
-    const diff = taskStart - chartStart;
-    const daysDiff = diff / (1000 * 60 * 60 * 24);
-    return daysDiff * columnWidth;
-  };
-
-  const getTaskWidth = (task: Task): number => {
-    const taskStart = task.startDate.getTime();
-    const taskEnd = task.endDate.getTime();
-    const diff = taskEnd - taskStart;
-    const daysDiff = diff / (1000 * 60 * 60 * 24);
-    return daysDiff * columnWidth;
-  };
-
-  const handleTaskClick = (task: Task, event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (view === 'gantt') {
-      onTaskClick(task);
-    }
-  };
-
-  const handleMouseDown = (event: React.MouseEvent, date: Date) => {
-    if (view === 'kanban') return;
+    if (viewMode !== 'gantt') return;
     
-    setDragging(true);
-    setHoveredDate(date);
-    setDragStart(date);
-  };
+    const wheelTarget = chartRef.current;
+    if (!wheelTarget) return;
 
-  const handleMouseMove = (event: React.MouseEvent) => {
-    if (view === 'kanban') return;
-    
-    if (dragging) {
-      const rect = chartRef.current?.getBoundingClientRect();
-      if (rect) {
-        const mouseX = event.clientX - rect.left;
-        const dayOffset = Math.floor(mouseX / columnWidth);
-        const newHoveredDate = new Date(startDate);
-        newHoveredDate.setDate(startDate.getDate() + dayOffset);
-        setHoveredDate(newHoveredDate);
+    const handleWheel = (e: WheelEvent) => {
+        e.preventDefault();
+        wheelTarget.scrollLeft += e.deltaY;
+    };
+
+    wheelTarget.addEventListener('wheel', handleWheel, { passive: false });
+    return () => wheelTarget.removeEventListener('wheel', handleWheel);
+  }, [viewMode]);
+
+  // --- LOGICA DRAG & DROP ---
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (viewMode !== 'gantt' || e.button !== 0 || isTaskBeingDragged) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('.task-bar')) return;
+
+    const chartEl = chartRef.current;
+    if (chartEl && chartEl.contains(target)) {
+      const rect = chartEl.getBoundingClientRect();
+      const x = e.clientX - rect.left + scrollOffset;
+      const y = e.clientY - rect.top;
+      const dayIndex = Math.floor(x / dayWidth);
+      const date = timeline[dayIndex];
+      if (date) {
+        setIsDragging(true);
+        setNewTaskPreview({ startDate: new Date(date), endDate: new Date(date), x, y });
       }
     }
   };
-
+  
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (viewMode !== 'gantt' || !isDragging || !newTaskPreview || !chartRef.current || isTaskBeingDragged) return;
+    const rect = chartRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left + scrollOffset;
+    const dayIndex = Math.max(0, Math.floor(x / dayWidth));
+    const endDate = timeline[dayIndex] ? new Date(timeline[dayIndex]) : new Date(newTaskPreview.endDate);
+    setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
+  };
+  
   const handleMouseUp = () => {
-    if (view === 'kanban') return;
-    
-    if (dragging && dragStart && hoveredDate) {
-      const daysDiff = (hoveredDate.getTime() - dragStart.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysDiff !== 0 && draggedTask) {
-        onTaskUpdate(draggedTask, {
-          startDate: daysDiff > 0 ? dragStart : hoveredDate,
-          endDate: daysDiff > 0 ? hoveredDate : dragStart,
-        });
-      }
-      setDragging(false);
-      setDraggedTask(null);
-      setDragStart(null);
-      setHoveredDate(null);
+    if (viewMode !== 'gantt' || !isDragging || !newTaskPreview || isTaskBeingDragged) return;
+    const { startDate, endDate } = newTaskPreview;
+    if (startDate.getTime() === endDate.getTime()) {
+         setIsDragging(false);
+         setNewTaskPreview(null);
+         return;
+    }
+
+    const newTask: Task = {
+      id: Date.now().toString(), title: 'New Task', description: '',
+      startDate: startDate < endDate ? new Date(startDate) : new Date(endDate),
+      endDate: startDate < endDate ? new Date(endDate) : new Date(startDate),
+      color: '#f5f5dc', milestones: [], status: 'To Do'
+    };
+    setTasks(prev => [...prev, newTask]);
+    setSelectedTask(newTask);
+    setIsEditModalOpen(true);
+    setIsDragging(false);
+    setNewTaskPreview(null);
+  };
+
+  const handleCalendarDateSelect = (date: Date | undefined) => {
+    setSelectedCalendarDate(date);
+    if (date) {
+        setCurrentDate(date);
+        setIsCalendarOpen(false);
     }
   };
 
-  const handleMouseEnter = (task: Task) => {
-    if (dragging) {
-      setDraggedTask(task.id);
-    }
-  };
-
-  const handleColumnWidthChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(event.target.value, 10);
-    if (!isNaN(value) && value > 0) {
-      setColumnWidth(value);
-    }
-  };
-
-  const moveChart = (days: number) => {
-    const newStartDate = new Date(startDate);
-    newStartDate.setDate(startDate.getDate() + days);
-    setStartDate(newStartDate);
-
-    const newEndDate = new Date(endDate);
-    newEndDate.setDate(endDate.getDate() + days);
-    setEndDate(newEndDate);
-  };
-
-  const moveToStart = () => {
-    const firstTask = tasks.reduce((prev, curr) => (curr.startDate < prev.startDate ? curr : prev));
-    if (firstTask) {
-      setStartDate(new Date(firstTask.startDate));
-      const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const newEndDate = new Date(firstTask.startDate);
-      newEndDate.setDate(firstTask.startDate.getDate() + days);
-      setEndDate(newEndDate);
-    }
-  };
-
-  const moveToEnd = () => {
-    const lastTask = tasks.reduce((prev, curr) => (curr.endDate > prev.endDate ? curr : prev));
-    if (lastTask) {
-      setEndDate(new Date(lastTask.endDate));
-      const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const newStartDate = new Date(lastTask.endDate);
-      newStartDate.setDate(lastTask.endDate.getDate() - days);
-      setStartDate(newStartDate);
-    }
-  };
+  // --- RENDER DEL COMPONENTE ---
+  if (viewMode === 'kanban') {
+    return (
+        <div className="h-screen flex flex-col bg-background">
+            {/* Header Kanban */}
+            <div className="flex items-center justify-between p-2 sm:p-6 border-b border-border bg-card">
+              <h1 className="text-base sm:text-2xl font-bold truncate">Kanban</h1>
+              <div className="flex items-center gap-1 sm:gap-2">
+                 {/* Controlli Mobile */}
+                 <div className="sm:hidden">
+                     <Sheet>
+                         <SheetTrigger asChild>
+                             <Button variant="outline" size="sm"><Menu className="w-4 h-4" /></Button>
+                         </SheetTrigger>
+                         <SheetContent side="right" className="w-80">
+                             <SheetHeader>
+                                 <SheetTitle>Menu</SheetTitle>
+                             </SheetHeader>
+                             <div className="space-y-4 mt-6">
+                                 <div className="flex flex-col gap-2">
+                                     <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'outline'} className="w-full justify-start">
+                                         <BarChart3 className="w-4 h-4 mr-2" />Gantt
+                                     </Button>
+                                     <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'outline'} className="w-full justify-start">
+                                         <Kanban className="w-4 h-4 mr-2" />Kanban
+                                     </Button>
+                                 </div>
+                                 <Button onClick={() => setIsCalendarOpen(true)} variant="outline" className="w-full justify-start">
+                                     <CalendarIcon className="w-4 h-4 mr-2" />Calendar
+                                 </Button>
+                                 <Button onClick={handleAddTask} className="w-full justify-start">
+                                     <Plus className="w-4 h-4 mr-2" />Add Task
+                                 </Button>
+                                 <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="w-full justify-start">
+                                     <Settings className="w-4 h-4 mr-2" />Settings
+                                 </Button>
+                                 <Button onClick={toggleTheme} variant="outline" className="w-full justify-start">
+                                     {theme === 'light' ? <Moon className="w-4 h-4 mr-2" /> : <Sun className="w-4 h-4 mr-2" />}
+                                     {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                                 </Button>
+                             </div>
+                         </SheetContent>
+                     </Sheet>
+                 </div>
+                {/* Controlli Desktop */}
+                 <div className="hidden sm:flex items-center gap-3">
+                     <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                        <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'ghost'} size="sm" className="rounded-md"><BarChart3 className="w-4 h-4 mr-2" />Gantt</Button>
+                        <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="rounded-md"><Kanban className="w-4 h-4 mr-2" />Kanban</Button>
+                     </div>
+                     <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                         <SheetTrigger asChild>
+                             <Button variant="outline" size="sm" className="rounded-xl shadow-sm"><CalendarIcon className="w-4 h-4" /></Button>
+                         </SheetTrigger>
+                         <SheetContent side="left" className="w-auto p-0">
+                             <Calendar mode="single" selected={selectedCalendarDate} onSelect={handleCalendarDateSelect} className="rounded-xl"/>
+                         </SheetContent>
+                     </Sheet>
+                     <Button onClick={handleAddTask} size="sm" className="rounded-xl shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Task</Button>
+                     <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-xl shadow-sm"><Settings className="w-4 h-4" /></Button>
+                     <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-xl shadow-sm">{theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}</Button>
+                 </div>
+              </div>
+            </div>
+            <KanbanView tasks={tasks} onTaskUpdate={handleTaskUpdate} onTaskClick={handleTaskClick} />
+            {/* Modals */}
+            <TaskEditModal task={selectedTask} isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setSelectedTask(null); }} onSave={(updates) => { if (selectedTask) handleTaskUpdate(selectedTask.id, updates); }} onDelete={(taskId) => { setTasks(prev => prev.filter(task => task.id !== taskId)); setIsEditModalOpen(false); setSelectedTask(null); }} />
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} dayColors={dayColors} onDayColorsChange={setDayColors} />
+        </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between p-4">
-        <div className="flex items-center space-x-2">
-          <Label htmlFor="columnWidth" className="text-sm">Column Width:</Label>
-          <Input
-            id="columnWidth"
-            type="number"
-            className="w-20 text-sm"
-            value={columnWidth}
-            onChange={handleColumnWidthChange}
-          />
-        </div>
+    <div className="h-screen flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between p-2 sm:p-6 border-b border-border bg-card">
+         <div className="flex items-center gap-4">
+           <h1 className="text-base sm:text-2xl font-bold truncate">Study Gantt</h1>
+           <div className="text-sm text-muted-foreground font-medium">
+             {getCurrentVisibleMonth()}
+           </div>
+         </div>
+         <div className="flex items-center gap-1 sm:gap-2">
+            {/* Controlli Mobile */}
+             <div className="sm:hidden">
+                 <Sheet>
+                     <SheetTrigger asChild>
+                         <Button variant="outline" size="sm"><Menu className="w-4 h-4" /></Button>
+                     </SheetTrigger>
+                     <SheetContent side="right" className="w-80">
+                         <SheetHeader>
+                             <SheetTitle>Menu</SheetTitle>
+                         </SheetHeader>
+                         <div className="space-y-4 mt-6">
+                             <div className="flex flex-col gap-2">
+                                 <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'outline'} className="w-full justify-start">
+                                     <BarChart3 className="w-4 h-4 mr-2" />Gantt
+                                 </Button>
+                                 <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'outline'} className="w-full justify-start">
+                                     <Kanban className="w-4 h-4 mr-2" />Kanban
+                                 </Button>
+                             </div>
+                             <Button onClick={() => setIsCalendarOpen(true)} variant="outline" className="w-full justify-start">
+                                 <CalendarIcon className="w-4 h-4 mr-2" />Calendar
+                             </Button>
+                             <Button onClick={handleAddTask} className="w-full justify-start">
+                                 <Plus className="w-4 h-4 mr-2" />Add Task
+                             </Button>
+                             <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="w-full justify-start">
+                                 <Settings className="w-4 h-4 mr-2" />Settings
+                             </Button>
+                             <Button onClick={toggleTheme} variant="outline" className="w-full justify-start">
+                                 {theme === 'light' ? <Moon className="w-4 h-4 mr-2" /> : <Sun className="w-4 h-4 mr-2" />}
+                                 {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                             </Button>
+                         </div>
+                     </SheetContent>
+                 </Sheet>
+             </div>
+            {/* Controlli Desktop */}
+             <div className="hidden sm:flex items-center gap-3">
+                 <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                    <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'ghost'} size="sm" className="rounded-md"><BarChart3 className="w-4 h-4 mr-2" />Gantt</Button>
+                    <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="rounded-md"><Kanban className="w-4 h-4 mr-2" />Kanban</Button>
+                 </div>
+                 <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                     <SheetTrigger asChild>
+                         <Button variant="outline" size="sm" className="rounded-xl shadow-sm"><CalendarIcon className="w-4 h-4" /></Button>
+                     </SheetTrigger>
+                     <SheetContent side="left" className="w-auto p-0">
+                         <Calendar mode="single" selected={selectedCalendarDate} onSelect={handleCalendarDateSelect} className="rounded-xl"/>
+                     </SheetContent>
+                 </Sheet>
+                 <Button onClick={handleAddTask} size="sm" className="rounded-xl shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Task</Button>
+                 <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-xl shadow-sm"><Settings className="w-4 h-4" /></Button>
+                 <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-xl shadow-sm">{theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}</Button>
+             </div>
+         </div>
+      </div>
+      
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden bg-card rounded-none sm:rounded-xl m-0 sm:m-2 shadow-sm">
+          {/* Month Header */}
+          <div ref={headerRef} className="flex border-b border-border bg-muted/20 overflow-hidden">
+            {Object.entries(monthGroups).map(([key, group]) => (
+              <div key={key} className="border-r border-border px-1 sm:px-4 py-1 sm:py-4 text-center font-semibold bg-muted/30 text-xs sm:text-sm"
+                   style={{ minWidth: `${group.count * dayWidth}px` }}>
+                <div className="sm:hidden">{group.month.slice(0, 3)}</div>
+                <div className="hidden sm:block">{group.month} {group.year}</div>
+              </div>
+            ))}
+          </div>
 
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="icon" onClick={moveToStart}>
-            <ChevronsLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => moveChart(-7)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={cn(
-                  "w-[280px] justify-start text-left font-normal",
-                  !dateRange?.from && "text-muted-foreground"
+          {/* Day Header */}
+          <div ref={timelineRef} className="flex border-b border-border bg-card overflow-x-hidden">
+            {timeline.map((date, index) => {
+              const isMonthStart = date.getDate() === 1;
+              const isSelectedDate = selectedCalendarDate && date.toDateString() === selectedCalendarDate.toDateString();
+              return (
+                <div key={index} className={`relative border-r border-border p-1 sm:p-4 text-center text-xs sm:text-sm transition-colors duration-200 ${isSelectedDate ? 'bg-primary/20' : ''}`}
+                     style={{ 
+                       backgroundColor: isSelectedDate ? undefined : dayColors[date.getDay()],
+                       minWidth: `${dayWidth}px` 
+                     }}>
+                  {isMonthStart && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary/30 rounded-full" />}
+                  <div className="font-semibold text-sm sm:text-lg">{date.getDate()}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{dayNames[date.getDay()]}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Tasks Timeline */}
+          <div ref={chartRef} className="flex-1 overflow-auto relative bg-background"
+               style={{ minHeight: '200px', cursor: isDragging ? 'crosshair' : 'default' }}
+               onScroll={handleMainScroll}
+               onMouseDown={handleMouseDown}
+               onMouseMove={handleMouseMove}
+               onMouseUp={handleMouseUp}
+               onMouseLeave={handleMouseUp}>
+            
+            <div className="relative w-full h-full">
+                 {/* Vertical Grid Lines */}
+                 <div className="absolute top-0 left-0 h-full w-max pointer-events-none">
+                     {timeline.map((date, index) => {
+                         const isWeekStart = date.getDay() === 0;
+                         const isMonthStart = date.getDate() === 1;
+                         return (
+                             <div key={`line-${index}`}>
+                                 {isWeekStart && <div className="absolute top-0 bottom-0 w-px bg-border/20" style={{ left: `${index * dayWidth}px` }} />}
+                                 {isMonthStart && <div className="absolute top-0 bottom-0 w-0.5 bg-border/40" style={{ left: `${index * dayWidth}px` }} />}
+                             </div>
+                         );
+                     })}
+                 </div>
+
+                {/* Task bars */}
+                {tasksWithRows.map((task) => (
+                    <TaskBar 
+                      key={task.id} 
+                      task={task} 
+                      timeline={timeline} 
+                      yPosition={(task as any).rowIndex * 60 + 10}
+                      dayWidth={dayWidth} 
+                      scrollOffset={scrollOffset} 
+                      onUpdate={(updates) => handleTaskUpdate(task.id, updates)}
+                      onClick={() => handleTaskClick(task)}
+                      onDragStart={() => setIsTaskBeingDragged(true)}
+                      onDragEnd={() => setIsTaskBeingDragged(false)}
+                    />
+                ))}
+
+                {/* New task preview */}
+                {newTaskPreview && !isTaskBeingDragged && (
+                    <div className="absolute rounded-lg border border-dashed border-primary bg-primary/20 pointer-events-none"
+                         style={{
+                             left: `${Math.min(timeline.findIndex(d => d.toDateString() === newTaskPreview.startDate.toDateString()), timeline.findIndex(d => d.toDateString() === newTaskPreview.endDate.toDateString())) * dayWidth}px`,
+                             top: `${Math.floor((newTaskPreview.y - 10) / 60) * 60 + 10}px`,
+                             width: `${(Math.abs(newTaskPreview.endDate.getTime() - newTaskPreview.startDate.getTime()) / (1000 * 60 * 60 * 24) + 1) * dayWidth}px`,
+                             height: '40px'
+                         }} />
                 )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateRange?.from ? (
-                  dateRange.to ? (
-                    `${format(dateRange.from, "MMM dd, yyyy")} - ${format(dateRange.to, "MMM dd, yyyy")}`
-                  ) : (
-                    format(dateRange.from, "MMM dd, yyyy")
-                  )
-                ) : (
-                  <span>Pick a date</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="center" side="bottom">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={startDate}
-                selected={dateRange}
-                onSelect={setDateRange}
-                numberOfMonths={2}
-                pagedNavigation
-                className="border-0 rounded-md overflow-hidden"
-              />
-            </PopoverContent>
-          </Popover>
-          <Button variant="outline" size="icon" onClick={() => moveChart(7)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={moveToEnd}>
-            <ChevronsRight className="h-4 w-4" />
-          </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {view === 'gantt' ? (
-        <div className="flex-1 overflow-auto">
-          <div
-            className="relative"
-            style={{ width: `${daysInRange * columnWidth}px`, height: `${tasks.length * 40 + 40}px` }}
-            onMouseUp={handleMouseUp}
-            onMouseMove={handleMouseMove}
-            ref={chartRef}
-          >
-            {/* Dates */}
-            <div className="sticky top-0 left-0 grid grid-cols-[50px_repeat(auto-fill,minmax(50px,_1fr))] z-10 bg-background border-b border-border">
-              <div className="text-xs font-bold uppercase text-muted-foreground flex items-center justify-center h-10">Tasks</div>
-              {generateDates().map((date) => (
-                <div
-                  key={date.toISOString()}
-                  className={cn(
-                    "flex items-center justify-center h-10 border-r border-border text-xs",
-                    isWeekend(date) ? 'bg-secondary' : '',
-                    getDayColor(date) ? 'bg-primary/10' : '',
-                  )}
-                  style={{ width: `${columnWidth}px` }}
-                >
-                  {formatDate(date)}
-                </div>
-              ))}
-            </div>
-
-            {/* Tasks */}
-            {tasks.map((task, index) => (
-              <React.Fragment key={task.id}>
-                <div
-                  className="absolute left-0 flex items-center justify-end h-10 bg-background border-b border-border font-medium text-sm"
-                  style={{ top: `${index * 40 + 40}px`, width: '50px' }}
-                >
-                  <Button variant="ghost" size="sm" onClick={(e) => handleTaskClick(task, e)}>{task.title}</Button>
-                </div>
-                <div
-                  key={task.id}
-                  draggable={view === 'gantt'}
-                  className="absolute h-10 rounded shadow-md border cursor-pointer touch-manipulation"
-                  style={{
-                    left: `${getTaskPosition(task) + 50}px`,
-                    top: `${index * 40 + 40}px`,
-                    width: `${getTaskWidth(task)}px`,
-                    backgroundColor: task.color,
-                    color: task.textColor || '#fff',
-                  }}
-                  onClick={(e) => handleTaskClick(task, e)}
-                  onMouseDown={(event) => handleMouseDown(event, task.startDate)}
-                  onMouseEnter={() => handleMouseEnter(task)}
-                >
-                  <div className="flex items-center h-full px-2 font-medium text-sm">
-                    {task.title}
-                    {/* Progress Bar */}
-                    <Progress value={50} className="w-1/4 h-1 ml-auto" style={{ backgroundColor: 'rgba(0,0,0,0.2)' }} />
-                  </div>
-                </div>
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <KanbanView tasks={tasks} onTaskUpdate={onTaskUpdate} onTaskClick={onTaskClick} />
-      )}
+      {/* Modals */}
+      <TaskEditModal task={selectedTask} isOpen={isEditModalOpen}
+        onClose={() => { setIsEditModalOpen(false); setSelectedTask(null); }}
+        onSave={(updates) => { if (selectedTask) handleTaskUpdate(selectedTask.id, updates); }}
+        onDelete={(taskId) => { setTasks(prev => prev.filter(task => task.id !== taskId)); setIsEditModalOpen(false); setSelectedTask(null); }} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} dayColors={dayColors} onDayColorsChange={setDayColors} />
     </div>
   );
 };

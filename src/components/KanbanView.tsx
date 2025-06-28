@@ -176,15 +176,18 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             <span className="text-xs opacity-70">Progress</span>
                             <span className="text-xs opacity-70">{progress}%</span>
                           </div>
-                          <div className="w-full bg-black/20 rounded-full h-2">
-                            <div 
-                              className="h-2 rounded-full transition-all duration-300"
-                              style={{ 
-                                width: `${progress}%`,
-                                backgroundColor: task.progressBarColor || '#22c55e'
-                              }}
-                            />
-                          </div>
+                          <Progress 
+                            value={progress} 
+                            className="h-2"
+                            style={{
+                              backgroundColor: 'rgba(0,0,0,0.2)'
+                            }}
+                          />
+                          <style jsx>{`
+                            .progress-indicator {
+                              background-color: ${task.progressBarColor || '#22c55e'} !important;
+                            }
+                          `}</style>
                         </div>
                         
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs opacity-70 gap-1 sm:gap-0">
