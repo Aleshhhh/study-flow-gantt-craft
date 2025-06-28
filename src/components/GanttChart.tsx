@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -77,7 +78,7 @@ export const GanttChart: React.FC = () => {
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   // Group dates by month for header - Fixed TypeScript error
-  const monthGroups = timeline.reduce((acc: Record<string, MonthGroup>, date) => {
+  const monthGroups: Record<string, MonthGroup> = timeline.reduce((acc: Record<string, MonthGroup>, date) => {
     const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
     if (!acc[monthKey]) {
       acc[monthKey] = { month: monthNames[date.getMonth()], year: date.getFullYear().toString(), count: 0 };
@@ -193,7 +194,7 @@ export const GanttChart: React.FC = () => {
 
   // Handle drag to create tasks - Only with left mouse button
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (viewMode !== 'gantt' || e.button !== 0) return;
+    if (viewMode === 'kanban' || e.button !== 0) return;
     if (e.target === chartRef.current) {
       const rect = chartRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left + scrollOffset;
@@ -209,7 +210,7 @@ export const GanttChart: React.FC = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (viewMode !== 'gantt' || !isDragging || !newTaskPreview || !chartRef.current) return;
+    if (viewMode === 'kanban' || !isDragging || !newTaskPreview || !chartRef.current) return;
     
     const rect = chartRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left + scrollOffset;
@@ -220,7 +221,7 @@ export const GanttChart: React.FC = () => {
   };
 
   const handleMouseUp = () => {
-    if (viewMode !== 'gantt' || !isDragging || !newTaskPreview) return;
+    if (viewMode === 'kanban' || !isDragging || !newTaskPreview) return;
     
     const newTask: Task = {
       id: Date.now().toString(),
