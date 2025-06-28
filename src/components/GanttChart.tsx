@@ -106,7 +106,19 @@ export const GanttChart: React.FC = () => {
         gantt: scrollOffset
       }));
     }
-  }, [viewMode, savedScrollPositions.gantt, scrollOffset]);
+  }, [viewMode]);
+
+  // Save scroll position when leaving Gantt view
+  useEffect(() => {
+    return () => {
+      if (viewMode === 'gantt') {
+        setSavedScrollPositions(prev => ({
+          ...prev,
+          gantt: scrollOffset
+        }));
+      }
+    };
+  }, [scrollOffset, viewMode]);
 
   // --- LOGICA DI GENERAZIONE TIMELINE ---
   const generateDynamicTimeline = useCallback(() => {
@@ -198,9 +210,8 @@ export const GanttChart: React.FC = () => {
   }, [isLoading, daysToNavigate]);
 
   const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (viewMode === 'gantt') {
-      setScrollOffset(e.currentTarget.scrollLeft);
-    }
+    const newScrollOffset = e.currentTarget.scrollLeft;
+    setScrollOffset(newScrollOffset);
   };
   
   useEffect(() => {
@@ -271,18 +282,20 @@ export const GanttChart: React.FC = () => {
       const date = timeline[dayIndex];
       if (date) {
         setIsDragging(true);
-        setNewTaskPreview({ startDate: date, endDate: date, x, y });
+        setNewTaskPreview({ startDate: new Date(date), endDate: new Date(date), x, y });
       }
     }
   };
+  
   const handleMouseMove = (e: React.MouseEvent) => {
     if (viewMode !== 'gantt' || !isDragging || !newTaskPreview || !chartRef.current || isTaskBeingDragged) return;
     const rect = chartRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left + scrollOffset;
     const dayIndex = Math.max(0, Math.floor(x / dayWidth));
-    const endDate = timeline[dayIndex] || newTaskPreview.endDate;
+    const endDate = timeline[dayIndex] ? new Date(timeline[dayIndex]) : new Date(newTaskPreview.endDate);
     setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
   };
+  
   const handleMouseUp = () => {
     if (viewMode !== 'gantt' || !isDragging || !newTaskPreview || isTaskBeingDragged) return;
     const { startDate, endDate } = newTaskPreview;
@@ -294,8 +307,8 @@ export const GanttChart: React.FC = () => {
 
     const newTask: Task = {
       id: Date.now().toString(), title: 'New Task', description: '',
-      startDate: startDate < endDate ? startDate : endDate,
-      endDate: startDate < endDate ? endDate : startDate,
+      startDate: startDate < endDate ? new Date(startDate) : new Date(endDate),
+      endDate: startDate < endDate ? new Date(endDate) : new Date(startDate),
       color: '#f5f5dc', milestones: [], status: 'To Do'
     };
     setTasks(prev => [...prev, newTask]);
@@ -391,11 +404,9 @@ export const GanttChart: React.FC = () => {
       <div className="flex items-center justify-between p-2 sm:p-6 border-b border-border bg-card">
          <div className="flex items-center gap-4">
            <h1 className="text-base sm:text-2xl font-bold truncate">Study Gantt</h1>
-           {viewMode === 'gantt' && (
-             <div className="text-sm text-muted-foreground font-medium">
-               {getCurrentVisibleMonth()}
-             </div>
-           )}
+           <div className="text-sm text-muted-foreground font-medium">
+             {getCurrentVisibleMonth()}
+           </div>
          </div>
          <div className="flex items-center gap-1 sm:gap-2">
             {/* Controlli Mobile */}
@@ -532,7 +543,7 @@ export const GanttChart: React.FC = () => {
                 {newTaskPreview && !isTaskBeingDragged && (
                     <div className="absolute rounded-lg border border-dashed border-primary bg-primary/20 pointer-events-none"
                          style={{
-                             left: `${Math.min(timeline.findIndex(d => d.getTime() === newTaskPreview.startDate.getTime()), timeline.findIndex(d => d.getTime() === newTaskPreview.endDate.getTime())) * dayWidth}px`,
+                             left: `${Math.min(timeline.findIndex(d => d.toDateString() === newTaskPreview.startDate.toDateString()), timeline.findIndex(d => d.toDateString() === newTaskPreview.endDate.toDateString())) * dayWidth}px`,
                              top: `${Math.floor((newTaskPreview.y - 10) / 60) * 60 + 10}px`,
                              width: `${(Math.abs(newTaskPreview.endDate.getTime() - newTaskPreview.startDate.getTime()) / (1000 * 60 * 60 * 24) + 1) * dayWidth}px`,
                              height: '40px'
