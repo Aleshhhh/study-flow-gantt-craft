@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -93,7 +92,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     }
   };
 
-  const getTextColor = (backgroundColor: string) => {
+  const getTextColor = (backgroundColor: string, customTextColor?: string) => {
+    if (customTextColor) return customTextColor;
+    
     const hex = backgroundColor.replace('#', '');
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
@@ -144,6 +145,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 <div className="p-3 sm:p-4 space-y-3 min-h-96 max-h-screen overflow-y-auto">
                   {columnTasks.map((task) => {
                     const progress = getTaskProgress(task.status || 'To Do');
+                    const textColor = getTextColor(task.color, task.textColor);
                     
                     return (
                       <div
@@ -155,7 +157,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         style={{
                           backgroundColor: task.color,
                           borderColor: task.color,
-                          color: getTextColor(task.color)
+                          color: textColor
                         }}
                       >
                         <div className="flex items-start justify-between mb-2">
@@ -176,11 +178,16 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </div>
                           <Progress 
                             value={progress} 
-                            className="h-2 bg-black/20"
+                            className="h-2"
                             style={{
                               backgroundColor: 'rgba(0,0,0,0.2)'
                             }}
                           />
+                          <style jsx>{`
+                            .progress-indicator {
+                              background-color: ${task.progressBarColor || '#22c55e'} !important;
+                            }
+                          `}</style>
                         </div>
                         
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs opacity-70 gap-1 sm:gap-0">
