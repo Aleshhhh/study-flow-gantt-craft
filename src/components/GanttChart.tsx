@@ -86,7 +86,6 @@ export const GanttChart: React.FC = () => {
     return acc;
   }, {});
 
-  // Arrange tasks in rows to avoid overlap
   const arrangeTasksInRows = () => {
     const rows: Task[][] = [];
     const sortedTasks = [...tasks].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
