@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -169,7 +170,7 @@ export const GanttChart: React.FC = () => {
 
   // Fixed mouse event handlers for drag-to-add functionality
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (viewMode === 'kanban' || e.button !== 0 || !chartRef.current) return;
+    if (e.button !== 0 || !chartRef.current) return;
     
     // Only start dragging if clicking on the chart background, not on task elements
     const target = e.target as HTMLElement;
@@ -188,7 +189,7 @@ export const GanttChart: React.FC = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (viewMode === 'kanban' || !isDragging || !newTaskPreview || !chartRef.current) return;
+    if (!isDragging || !newTaskPreview || !chartRef.current) return;
     
     const rect = chartRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left + chartRef.current.scrollLeft;
@@ -199,7 +200,7 @@ export const GanttChart: React.FC = () => {
   };
 
   const handleMouseUp = () => {
-    if (viewMode === 'kanban' || !isDragging || !newTaskPreview) return;
+    if (!isDragging || !newTaskPreview) return;
     
     const newTask: Task = {
       id: Date.now().toString(),
