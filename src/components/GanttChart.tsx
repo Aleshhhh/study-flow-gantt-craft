@@ -25,7 +25,6 @@ export const GanttChart: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [viewMode, setViewMode] = useState<ViewMode>('gantt');
   
-  // ... keep existing code (tasks state and other state variables)
   const [tasks, setTasks] = useState<Task[]>([
     {
       id: '1',
@@ -69,32 +68,26 @@ export const GanttChart: React.FC = () => {
 
   /**
    * Genera il timeline dinamico basato sulla data corrente e il numero di anni configurabile
-   * La data di fine è calcolata dinamicamente aggiungendo numberOfYearsToShow alla data corrente
+   * La data di fine è calcolata dinamicamente aggiungendo numberOfYearsToShow alla data di navigazione corrente
    */
   const generateDynamicTimeline = () => {
     const timeline = [];
-    const today = new Date();
     
-    // Calcola la data di inizio (6 mesi prima della data corrente)
-    const startDate = new Date(currentDate);
-    startDate.setDate(startDate.getDate() - Math.floor(visibleDays / 2));
+    // Usa currentDate come base per la generazione del timeline
+    const baseDate = new Date(currentDate);
+    
+    // Calcola la data di inizio (metà dei giorni visibili prima della data corrente)
+    const startDate = new Date(baseDate);
+    startDate.setDate(baseDate.getDate() - Math.floor(visibleDays / 2));
     startDate.setHours(0, 0, 0, 0);
     
-    // Calcola la data di fine dinamicamente (numberOfYearsToShow anni nel futuro)
-    const endDate = new Date(today);
-    endDate.setFullYear(today.getFullYear() + numberOfYearsToShow);
-    
-    // Genera solo i giorni necessari per la viewport corrente + buffer
+    // Genera i giorni necessari per la viewport corrente + buffer
     const totalDays = visibleDays + bufferDays * 2;
     
     for (let i = 0; i < totalDays; i++) {
       const date = new Date(startDate);
       date.setDate(startDate.getDate() + i);
-      
-      // Verifica che la data non superi il limite dinamico
-      if (date <= endDate) {
-        timeline.push(date);
-      }
+      timeline.push(date);
     }
     
     return timeline;
@@ -121,7 +114,6 @@ export const GanttChart: React.FC = () => {
     return acc;
   }, {});
 
-  // ... keep existing code (arrangeTasksInRows function)
   const arrangeTasksInRows = () => {
     const rows: Task[][] = [];
     const sortedTasks = [...tasks].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
@@ -152,7 +144,6 @@ export const GanttChart: React.FC = () => {
 
   const tasksWithRows = arrangeTasksInRows();
 
-  // ... keep existing code (event handlers)
   const handleTaskUpdate = (taskId: string, updates: Partial<Task>) => {
     setTasks(prev => prev.map(task => 
       task.id === taskId ? { ...task, ...updates } : task
@@ -181,27 +172,17 @@ export const GanttChart: React.FC = () => {
   };
 
   /**
-   * Navigazione dinamica che si adatta al range de date configurabile
+   * Navigazione dinamica senza limiti - permette di navigare infinitamente
    */
   const navigateDate = (direction: 'prev' | 'next') => {
     setCurrentDate(prev => {
       const newDate = new Date(prev);
       const daysToMove = direction === 'next' ? 30 : -30;
       newDate.setDate(newDate.getDate() + daysToMove);
-      
-      // Verifica che la nuova data sia nel range consentito
-      const today = new Date();
-      const maxDate = new Date(today);
-      maxDate.setFullYear(today.getFullYear() + numberOfYearsToShow);
-      
-      if (newDate <= maxDate) {
-        return newDate;
-      }
-      return prev; // Mantieni la data precedente se si supera il limite
+      return newDate;
     });
   };
 
-  // ... keep existing code (scroll handling and mouse events)
   const handleScroll = (scrollLeft: number) => {
     setScrollOffset(scrollLeft);
     
@@ -285,7 +266,6 @@ export const GanttChart: React.FC = () => {
     }
   };
 
-  // ... keep existing code (Kanban view return statement)
   if ((viewMode as ViewMode) === 'kanban') {
     return (
       <div className="h-screen flex flex-col bg-background">
@@ -413,7 +393,6 @@ export const GanttChart: React.FC = () => {
     );
   }
 
-  // ... keep existing code (Gantt view return statement with all JSX)
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
