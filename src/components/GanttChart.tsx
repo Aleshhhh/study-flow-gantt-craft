@@ -2,11 +2,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { TaskBar } from './TaskBar';
 import { TaskEditModal } from './TaskEditModal';
 import { SettingsModal } from './SettingsModal';
 import { useTheme } from './ThemeProvider';
-import { Moon, Sun, Settings, Plus, ChevronLeft, ChevronRight, BarChart3, Kanban } from 'lucide-react';
+import { Moon, Sun, Settings, Plus, ChevronLeft, ChevronRight, BarChart3, Kanban, Calendar as CalendarIcon, Menu } from 'lucide-react';
 import type { Task, DayColors } from '@/types/gantt';
 import { KanbanView } from './KanbanView';
 
@@ -37,6 +38,7 @@ export const GanttChart: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [dayColors, setDayColors] = useState<DayColors>({
     0: '#f3f4f6', // Sunday - light gray
     1: '#ffffff', // Monday - white
@@ -58,14 +60,20 @@ export const GanttChart: React.FC = () => {
 
   const dayWidth = 120;
 
-  // Generate timeline dates (60 days from current date)
+  // Generate timeline dates (extended to 2200)
   const generateTimeline = () => {
     const timeline = [];
     const startDate = new Date(currentDate);
-    startDate.setDate(startDate.getDate() - 15);
+    startDate.setDate(startDate.getDate() - 30);
     startDate.setHours(0, 0, 0, 0);
     
-    for (let i = 0; i < 60; i++) {
+    // Generate timeline until year 2200
+    const endYear = 2200;
+    const currentYear = new Date().getFullYear();
+    const totalYears = endYear - currentYear;
+    const daysToGenerate = totalYears * 365 + 365; // Add buffer
+    
+    for (let i = 0; i < daysToGenerate; i++) {
       const date = new Date(startDate);
       date.setDate(startDate.getDate() + i);
       timeline.push(date);
@@ -77,7 +85,7 @@ export const GanttChart: React.FC = () => {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  // Group dates by month for header - Fixed TypeScript error
+  // Group dates by month for header
   const monthGroups: Record<string, MonthGroup> = timeline.reduce((acc: Record<string, MonthGroup>, date) => {
     const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
     if (!acc[monthKey]) {
@@ -261,40 +269,91 @@ export const GanttChart: React.FC = () => {
   if (viewMode === 'kanban') {
     return (
       <div className="h-screen flex flex-col bg-background">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border bg-card rounded-b-xl">
-          <h1 className="text-2xl font-bold">Study Kanban Board</h1>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-              <Button
-                onClick={() => setViewMode('gantt')}
-                variant={viewMode === 'gantt' ? 'default' : 'ghost'}
-                size="sm"
-                className="rounded-md"
-              >
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Gantt
+        {/* Mobile Header */}
+        <div className="flex items-center justify-between p-3 sm:p-6 border-b border-border bg-card">
+          <h1 className="text-lg sm:text-2xl font-bold">Study Kanban Board</h1>
+          <div className="flex items-center gap-2">
+            {/* Mobile Menu */}
+            <div className="sm:hidden">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Menu className="w-4 h-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-80">
+                  <SheetHeader>
+                    <SheetTitle>Menu</SheetTitle>
+                  </SheetHeader>
+                  <div className="space-y-4 mt-6">
+                    <div className="space-y-2">
+                      <Button
+                        onClick={() => setViewMode('gantt')}
+                        variant="outline"
+                        className="w-full justify-start"
+                      >
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        Gantt View
+                      </Button>
+                      <Button
+                        onClick={() => setViewMode('kanban')}
+                        variant="default"
+                        className="w-full justify-start"
+                      >
+                        <Kanban className="w-4 h-4 mr-2" />
+                        Kanban View
+                      </Button>
+                    </div>
+                    <Button onClick={handleAddTask} className="w-full">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Task
+                    </Button>
+                    <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="w-full">
+                      <Settings className="w-4 h-4 mr-2" />
+                      Settings
+                    </Button>
+                    <Button onClick={toggleTheme} variant="outline" className="w-full">
+                      {theme === 'light' ? <Moon className="w-4 h-4 mr-2" /> : <Sun className="w-4 h-4 mr-2" />}
+                      {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+
+            {/* Desktop Controls */}
+            <div className="hidden sm:flex items-center gap-3">
+              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                <Button
+                  onClick={() => setViewMode('gantt')}
+                  variant={viewMode === 'gantt' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-md"
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Gantt
+                </Button>
+                <Button
+                  onClick={() => setViewMode('kanban')}
+                  variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-md"
+                >
+                  <Kanban className="w-4 h-4 mr-2" />
+                  Kanban
+                </Button>
+              </div>
+              <Button onClick={handleAddTask} size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Task
               </Button>
-              <Button
-                onClick={() => setViewMode('kanban')}
-                variant={viewMode === 'kanban' ? 'default' : 'ghost'}
-                size="sm"
-                className="rounded-md"
-              >
-                <Kanban className="w-4 h-4 mr-2" />
-                Kanban
+              <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                <Settings className="w-4 h-4" />
+              </Button>
+              <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
               </Button>
             </div>
-            <Button onClick={handleAddTask} size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Task
-            </Button>
-            <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-              <Settings className="w-4 h-4" />
-            </Button>
-            <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-              {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-            </Button>
           </div>
         </div>
 
@@ -337,82 +396,155 @@ export const GanttChart: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-border bg-card rounded-b-xl">
-        <h1 className="text-2xl font-bold">Study Gantt Chart</h1>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-            <Button
-              onClick={() => setViewMode('gantt')}
-              variant={viewMode === 'gantt' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-md"
-            >
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Gantt
+      <div className="flex items-center justify-between p-3 sm:p-6 border-b border-border bg-card">
+        <h1 className="text-lg sm:text-2xl font-bold">Study Gantt Chart</h1>
+        <div className="flex items-center gap-2">
+          {/* Mobile Menu */}
+          <div className="sm:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Menu className="w-4 h-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-80">
+                <SheetHeader>
+                  <SheetTitle>Menu</SheetTitle>
+                </SheetHeader>
+                <div className="space-y-4 mt-6">
+                  <div className="space-y-2">
+                    <Button
+                      onClick={() => setViewMode('gantt')}
+                      variant="default"
+                      className="w-full justify-start"
+                    >
+                      <BarChart3 className="w-4 h-4 mr-2" />
+                      Gantt View
+                    </Button>
+                    <Button
+                      onClick={() => setViewMode('kanban')}
+                      variant="outline"
+                      className="w-full justify-start"
+                    >
+                      <Kanban className="w-4 h-4 mr-2" />
+                      Kanban View
+                    </Button>
+                  </div>
+                  <Button
+                    onClick={() => setIsCalendarOpen(true)}
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <CalendarIcon className="w-4 h-4 mr-2" />
+                    Calendar
+                  </Button>
+                  <Button onClick={handleAddTask} className="w-full">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Task
+                  </Button>
+                  <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="w-full">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Settings
+                  </Button>
+                  <Button onClick={toggleTheme} variant="outline" className="w-full">
+                    {theme === 'light' ? <Moon className="w-4 h-4 mr-2" /> : <Sun className="w-4 h-4 mr-2" />}
+                    {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                  </Button>
+                  <div className="space-y-2">
+                    <Button onClick={() => navigateDate('prev')} variant="outline" className="w-full">
+                      <ChevronLeft className="w-4 h-4 mr-2" />
+                      Earlier
+                    </Button>
+                    <Button onClick={() => navigateDate('next')} variant="outline" className="w-full">
+                      <ChevronRight className="w-4 h-4 mr-2" />
+                      Later
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          {/* Desktop Controls */}
+          <div className="hidden sm:flex items-center gap-3">
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+              <Button
+                onClick={() => setViewMode('gantt')}
+                variant={viewMode === 'gantt' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-md"
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Gantt
+              </Button>
+              <Button
+                onClick={() => setViewMode('kanban')}
+                variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-md"
+              >
+                <Kanban className="w-4 h-4 mr-2" />
+                Kanban
+              </Button>
+            </div>
+            <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                  <CalendarIcon className="w-4 h-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-80">
+                <SheetHeader>
+                  <SheetTitle>Calendar</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6">
+                  <Calendar
+                    mode="single"
+                    selected={selectedCalendarDate}
+                    onSelect={handleCalendarDateSelect}
+                    className="rounded-xl"
+                  />
+                  <div className="mt-6 space-y-2">
+                    <Button onClick={() => navigateDate('prev')} variant="outline" className="w-full">
+                      <ChevronLeft className="w-4 h-4 mr-2" />
+                      Earlier
+                    </Button>
+                    <Button onClick={() => navigateDate('next')} variant="outline" className="w-full">
+                      <ChevronRight className="w-4 h-4 mr-2" />
+                      Later
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+            <Button onClick={handleAddTask} size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Task
             </Button>
-            <Button
-              onClick={() => setViewMode('kanban')}
-              variant={viewMode === 'kanban' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-md"
-            >
-              <Kanban className="w-4 h-4 mr-2" />
-              Kanban
+            <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+              <Settings className="w-4 h-4" />
+            </Button>
+            <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+              {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
             </Button>
           </div>
-          <Button onClick={handleAddTask} size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Task
-          </Button>
-          <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-            <Settings className="w-4 h-4" />
-          </Button>
-          <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-            {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-          </Button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Calendar Sidebar */}
-        <div className="w-80 border-r border-border bg-card flex flex-col rounded-r-xl m-2 ml-0 shadow-sm">
-          <div className="p-4 border-b border-border">
-            <h2 className="font-semibold mb-4">Calendar</h2>
-            <Calendar
-              mode="single"
-              selected={selectedCalendarDate}
-              onSelect={handleCalendarDateSelect}
-              className="rounded-xl"
-            />
-          </div>
-          <div className="flex-1 p-4">
-            <h3 className="font-medium mb-3">Navigation</h3>
-            <div className="flex gap-2">
-              <Button onClick={() => navigateDate('prev')} variant="outline" size="sm" className="rounded-xl flex-1 transition-all duration-300 hover:scale-105">
-                <ChevronLeft className="w-4 h-4" />
-                Earlier
-              </Button>
-              <Button onClick={() => navigateDate('next')} variant="outline" size="sm" className="rounded-xl flex-1 transition-all duration-300 hover:scale-105">
-                Later
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
+      {/* Main Content - Mobile Optimized */}
+      <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
         {/* Timeline Area */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-card rounded-xl m-2 shadow-sm">
+        <div className="flex-1 flex flex-col overflow-hidden bg-card rounded-none sm:rounded-xl m-0 sm:m-2 shadow-sm">
           {/* Month Header */}
           <div 
             ref={headerRef}
-            className="flex border-b border-border bg-muted/20 overflow-hidden rounded-t-xl"
+            className="flex border-b border-border bg-muted/20 overflow-hidden"
             onScroll={(e) => handleScroll((e.target as HTMLDivElement).scrollLeft)}
           >
             {Object.entries(monthGroups).map(([key, group]) => (
               <div 
                 key={key}
-                className="border-r border-border px-4 py-4 text-center font-semibold bg-muted/30 first:rounded-tl-xl"
+                className="border-r border-border px-2 sm:px-4 py-2 sm:py-4 text-center font-semibold bg-muted/30 text-xs sm:text-sm"
                 style={{ minWidth: `${group.count * dayWidth}px` }}
               >
                 {group.month} {group.year}
@@ -434,7 +566,7 @@ export const GanttChart: React.FC = () => {
               return (
                 <div 
                   key={index}
-                  className={`relative border-r border-border p-4 text-center text-sm transition-all duration-300 hover:bg-muted/20 ${
+                  className={`relative border-r border-border p-2 sm:p-4 text-center text-xs sm:text-sm transition-all duration-300 hover:bg-muted/20 ${
                     isSelectedDate ? 'bg-primary/20 border-primary shadow-md' : ''
                   }`}
                   style={{ 
@@ -448,7 +580,7 @@ export const GanttChart: React.FC = () => {
                   {isMonthStart && (
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/30 rounded-full" />
                   )}
-                  <div className="font-semibold text-lg">{date.getDate()}</div>
+                  <div className="font-semibold text-sm sm:text-lg">{date.getDate()}</div>
                   <div className="text-xs text-muted-foreground mt-1">{dayNames[date.getDay()]}</div>
                 </div>
               );
@@ -458,8 +590,8 @@ export const GanttChart: React.FC = () => {
           {/* Tasks Timeline */}
           <div 
             ref={chartRef}
-            className="flex-1 overflow-auto relative bg-background rounded-b-xl"
-            style={{ minHeight: '500px' }}
+            className="flex-1 overflow-auto relative bg-background"
+            style={{ minHeight: '300px' }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
