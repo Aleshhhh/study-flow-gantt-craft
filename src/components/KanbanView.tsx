@@ -17,6 +17,10 @@ interface KanbanViewProps {
   onCalendarOpen: () => void;
   onThemeToggle: () => void;
   theme: string;
+  onTaskDragStart?: (taskId: string) => void;
+  onTaskDragOver?: (e: React.DragEvent, targetTaskId: string) => void;
+  onTaskDrop?: (e: React.DragEvent, targetTaskId: string) => void;
+  draggedTaskId?: string | null;
 }
 
 export const KanbanView: React.FC<KanbanViewProps> = ({
@@ -28,7 +32,11 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   onSettingsOpen,
   onCalendarOpen,
   onThemeToggle,
-  theme
+  theme,
+  onTaskDragStart,
+  onTaskDragOver,
+  onTaskDrop,
+  draggedTaskId
 }) => {
   const [columns, setColumns] = useState<KanbanColumn[]>([
     { id: 'todo', title: 'To Do', taskIds: [] },
@@ -40,6 +48,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [draggedOverColumnIndex, setDraggedOverColumnIndex] = useState<number | null>(null);
+  const [draggedOverTask, setDraggedOverTask] = useState<string | null>(null);
 
   // Group tasks by status
   const getTasksByStatus = (status: string) => {
@@ -59,27 +68,56 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
 
   const handleTaskDragStart = (taskId: string) => {
     setDraggedTask(taskId);
+    if (onTaskDragStart) onTaskDragStart(taskId);
   };
 
-  const handleTaskDragOver = (e: React.DragEvent, columnId: string) => {
+  const handleTaskDragOver = (e: React.DragEvent, columnId?: string, taskId?: string) => {
     e.preventDefault();
-    setDraggedOverColumn(columnId);
+    if (columnId) {
+      setDraggedOverColumn(columnId);
+    }
+    if (taskId) {
+      setDraggedOverTask(taskId);
+      if (onTaskDragOver) onTaskDragOver(e, taskId);
+    }
   };
 
   const handleTaskDragLeave = () => {
     setDraggedOverColumn(null);
+    setDraggedOverTask(null);
   };
 
-  const handleTaskDrop = (e: React.DragEvent, columnId: string) => {
+  const handleTaskDrop = (e: React.DragEvent, columnId?: string, targetTaskId?: string) => {
     e.preventDefault();
+    
     if (draggedTask) {
-      const column = columns.find(col => col.id === columnId);
-      if (column) {
-        onTaskUpdate(draggedTask, { status: column.title });
+      if (targetTaskId && draggedTask !== targetTaskId) {
+        // Handle vertical reordering within same column or across columns
+        const draggedTaskObj = tasks.find(t => t.id === draggedTask);
+        const targetTaskObj = tasks.find(t => t.id === targetTaskId);
+        
+        if (draggedTaskObj && targetTaskObj) {
+          const targetColumn = columns.find(col => col.title === (targetTaskObj.status || 'To Do'));
+          if (targetColumn) {
+            // Update the dragged task's status to match target column
+            onTaskUpdate(draggedTask, { status: targetColumn.title });
+            
+            // Call parent's drop handler for reordering
+            if (onTaskDrop) onTaskDrop(e, targetTaskId);
+          }
+        }
+      } else if (columnId) {
+        // Handle column drop (status change only)
+        const column = columns.find(col => col.id === columnId);
+        if (column) {
+          onTaskUpdate(draggedTask, { status: column.title });
+        }
       }
     }
+    
     setDraggedTask(null);
     setDraggedOverColumn(null);
+    setDraggedOverTask(null);
   };
 
   // Column drag handlers
@@ -271,17 +309,26 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                   <div className="p-3 sm:p-4 space-y-3 min-h-96 max-h-screen overflow-y-auto">
                     {columnTasks.map((task) => {
                       const progress = getTaskProgress(task.status || 'To Do');
+                      const isDraggedOver = draggedOverTask === task.id;
+                      const isBeingDragged = (draggedTaskId || draggedTask) === task.id;
                       
                       return (
                         <div
                           key={task.id}
                           draggable
                           onDragStart={() => handleTaskDragStart(task.id)}
+                          onDragOver={(e) => handleTaskDragOver(e, undefined, task.id)}
+                          onDragLeave={handleTaskDragLeave}
+                          onDrop={(e) => handleTaskDrop(e, undefined, task.id)}
                           onClick={() => onTaskClick(task)}
-                          className="p-3 sm:p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md hover:scale-102 group active:scale-95 touch-manipulation"
+                          className={`p-3 sm:p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md hover:scale-102 group active:scale-95 touch-manipulation ${
+                            isBeingDragged ? 'opacity-50 scale-95' : ''
+                          } ${
+                            isDraggedOver ? 'border-primary border-2 scale-102' : ''
+                          }`}
                           style={{
                             backgroundColor: task.color,
-                            borderColor: task.color,
+                            borderColor: isDraggedOver ? undefined : task.color,
                             color: getTextColor(task.color)
                           }}
                         >

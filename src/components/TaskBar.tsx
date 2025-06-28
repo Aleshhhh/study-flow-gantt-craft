@@ -11,6 +11,7 @@ interface TaskBarProps {
   scrollOffset: number;
   onUpdate: (updates: Partial<Task>) => void;
   onClick: () => void;
+  onDragStart?: () => void;
 }
 
 export const TaskBar: React.FC<TaskBarProps> = ({ 
@@ -20,7 +21,8 @@ export const TaskBar: React.FC<TaskBarProps> = ({
   dayWidth,
   scrollOffset,
   onUpdate, 
-  onClick 
+  onClick,
+  onDragStart
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizingLeft, setIsResizingLeft] = useState(false);
@@ -61,6 +63,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
       e.preventDefault();
       setIsDragging(true);
       setDragStart({ x: e.clientX, startDate: new Date(task.startDate) });
+      if (onDragStart) onDragStart();
     }
   };
 

@@ -49,6 +49,8 @@ export const GanttChart: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [newTaskPreview, setNewTaskPreview] = useState<{ startDate: Date; endDate: Date; x: number; y: number } | null>(null);
   const [currentNavDate, setCurrentNavDate] = useState<Date>(new Date());
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [taskBeingMoved, setTaskBeingMoved] = useState<string | null>(null);
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
@@ -168,9 +170,41 @@ export const GanttChart: React.FC = () => {
     setIsCalendarOpen(false);
   };
 
+  // Task drag handlers for vertical reordering
+  const handleTaskDragStart = (taskId: string) => {
+    setDraggedTaskId(taskId);
+    setTaskBeingMoved(taskId);
+  };
+
+  const handleTaskDragOver = (e: React.DragEvent, targetTaskId: string) => {
+    e.preventDefault();
+  };
+
+  const handleTaskDrop = (e: React.DragEvent, targetTaskId: string) => {
+    e.preventDefault();
+    if (draggedTaskId && draggedTaskId !== targetTaskId) {
+      const draggedTask = tasks.find(t => t.id === draggedTaskId);
+      const targetTask = tasks.find(t => t.id === targetTaskId);
+      
+      if (draggedTask && targetTask) {
+        const newTasks = [...tasks];
+        const draggedIndex = newTasks.findIndex(t => t.id === draggedTaskId);
+        const targetIndex = newTasks.findIndex(t => t.id === targetTaskId);
+        
+        // Remove dragged task and insert at target position
+        const [removed] = newTasks.splice(draggedIndex, 1);
+        newTasks.splice(targetIndex, 0, removed);
+        
+        setTasks(newTasks);
+      }
+    }
+    setDraggedTaskId(null);
+    setTaskBeingMoved(null);
+  };
+
   // Fixed mouse event handlers for drag-to-add functionality
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || !chartRef.current) return;
+    if (e.button !== 0 || !chartRef.current || taskBeingMoved) return;
     
     // Only start dragging if clicking on the chart background, not on task elements
     const target = e.target as HTMLElement;
@@ -189,7 +223,7 @@ export const GanttChart: React.FC = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging || !newTaskPreview || !chartRef.current) return;
+    if (!isDragging || !newTaskPreview || !chartRef.current || taskBeingMoved) return;
     
     const rect = chartRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left + chartRef.current.scrollLeft;
@@ -200,7 +234,7 @@ export const GanttChart: React.FC = () => {
   };
 
   const handleMouseUp = () => {
-    if (!isDragging || !newTaskPreview) return;
+    if (!isDragging || !newTaskPreview || taskBeingMoved) return;
     
     const newTask: Task = {
       id: Date.now().toString(),
@@ -233,6 +267,10 @@ export const GanttChart: React.FC = () => {
           onCalendarOpen={() => setIsCalendarOpen(true)}
           onThemeToggle={toggleTheme}
           theme={theme}
+          onTaskDragStart={handleTaskDragStart}
+          onTaskDragOver={handleTaskDragOver}
+          onTaskDrop={handleTaskDrop}
+          draggedTaskId={draggedTaskId}
         />
         
         {/* Modals */}
@@ -314,7 +352,6 @@ export const GanttChart: React.FC = () => {
             ))}
           </div>
 
-          {/* Day Header */}
           <div ref={timelineRef} className="flex border-b border-border bg-card overflow-hidden select-none">
             {timeline.map((date, index) => (
               <div key={index} className={`relative border-r border-border p-1 sm:p-4 text-center text-xs sm:text-sm transition-all duration-300 hover:bg-muted/20 ${selectedCalendarDate && date.toDateString() === selectedCalendarDate.toDateString() ? 'bg-primary/20 border-primary shadow-md' : ''}`}
@@ -348,22 +385,31 @@ export const GanttChart: React.FC = () => {
                 );
               })}
 
-              {/* Task bars */}
+              {/* Task bars with drag and drop */}
               {tasksWithRows.map((task) => (
-                <TaskBar
-                  key={task.id} 
-                  task={task} 
-                  timeline={timeline} 
-                  yPosition={(task as any).rowIndex * 60 + 10}
-                  dayWidth={dayWidth} 
-                  scrollOffset={0}
-                  onUpdate={(updates) => handleTaskUpdate(task.id, updates)}
-                  onClick={() => handleTaskClick(task)}
-                />
+                <div
+                  key={task.id}
+                  draggable
+                  onDragStart={() => handleTaskDragStart(task.id)}
+                  onDragOver={(e) => handleTaskDragOver(e, task.id)}
+                  onDrop={(e) => handleTaskDrop(e, task.id)}
+                  className={`${draggedTaskId === task.id ? 'opacity-50' : ''}`}
+                >
+                  <TaskBar
+                    task={task} 
+                    timeline={timeline} 
+                    yPosition={(task as any).rowIndex * 60 + 10}
+                    dayWidth={dayWidth} 
+                    scrollOffset={0}
+                    onUpdate={(updates) => handleTaskUpdate(task.id, updates)}
+                    onClick={() => handleTaskClick(task)}
+                    onDragStart={() => handleTaskDragStart(task.id)}
+                  />
+                </div>
               ))}
 
               {/* New task preview */}
-              {newTaskPreview && (
+              {newTaskPreview && !taskBeingMoved && (
                 <div className="absolute rounded-xl shadow-sm border border-dashed border-muted-foreground/50 bg-muted/30 pointer-events-none"
                   style={{
                     left: `${timeline.findIndex(d => d.toDateString() === newTaskPreview.startDate.toDateString()) * dayWidth}px`,
