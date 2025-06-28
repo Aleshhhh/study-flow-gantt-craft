@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -6,8 +5,9 @@ import { TaskBar } from './TaskBar';
 import { TaskEditModal } from './TaskEditModal';
 import { SettingsModal } from './SettingsModal';
 import { useTheme } from './ThemeProvider';
-import { Moon, Sun, Settings, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Moon, Sun, Settings, Plus, ChevronLeft, ChevronRight, BarChart3, Kanban } from 'lucide-react';
 import type { Task, DayColors } from '@/types/gantt';
+import { KanbanView } from './KanbanView';
 
 interface MonthGroup {
   month: string;
@@ -15,8 +15,11 @@ interface MonthGroup {
   count: number;
 }
 
+type ViewMode = 'gantt' | 'kanban';
+
 export const GanttChart: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
+  const [viewMode, setViewMode] = useState<ViewMode>('gantt');
   const [tasks, setTasks] = useState<Task[]>([
     {
       id: '1',
@@ -25,7 +28,8 @@ export const GanttChart: React.FC = () => {
       startDate: new Date(2024, 0, 15),
       endDate: new Date(2024, 0, 20),
       color: '#6b7280',
-      milestones: ['Review notes', 'Practice problems']
+      milestones: ['Review notes', 'Practice problems'],
+      status: 'To Do'
     }
   ]);
   
@@ -51,7 +55,7 @@ export const GanttChart: React.FC = () => {
   const chartRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
 
-  const dayWidth = 120; // 3 times wider as requested
+  const dayWidth = 120;
 
   // Generate timeline dates (60 days from current date)
   const generateTimeline = () => {
@@ -132,7 +136,8 @@ export const GanttChart: React.FC = () => {
       startDate: new Date(),
       endDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
       color: '#6b7280',
-      milestones: []
+      milestones: [],
+      status: 'To Do'
     };
     setTasks(prev => [...prev, newTask]);
     setSelectedTask(newTask);
@@ -189,7 +194,7 @@ export const GanttChart: React.FC = () => {
 
   // Handle drag to create tasks - Only with left mouse button
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return; // Only left mouse button
+    if (viewMode !== 'gantt' || e.button !== 0) return;
     if (e.target === chartRef.current) {
       const rect = chartRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left + scrollOffset;
@@ -205,31 +210,33 @@ export const GanttChart: React.FC = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging && newTaskPreview && chartRef.current) {
-      const rect = chartRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left + scrollOffset;
-      const dayIndex = Math.floor(x / dayWidth);
-      const endDate = timeline[dayIndex] || newTaskPreview.endDate;
-      
-      setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
-    }
+    if (viewMode !== 'gantt' || !isDragging || !newTaskPreview || !chartRef.current) return;
+    
+    const rect = chartRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left + scrollOffset;
+    const dayIndex = Math.floor(x / dayWidth);
+    const endDate = timeline[dayIndex] || newTaskPreview.endDate;
+    
+    setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
   };
 
   const handleMouseUp = () => {
-    if (isDragging && newTaskPreview) {
-      const newTask: Task = {
-        id: Date.now().toString(),
-        title: 'New Task',
-        description: '',
-        startDate: newTaskPreview.startDate < newTaskPreview.endDate ? newTaskPreview.startDate : newTaskPreview.endDate,
-        endDate: newTaskPreview.startDate < newTaskPreview.endDate ? newTaskPreview.endDate : newTaskPreview.startDate,
-        color: '#6b7280',
-        milestones: []
-      };
-      setTasks(prev => [...prev, newTask]);
-      setSelectedTask(newTask);
-      setIsEditModalOpen(true);
-    }
+    if (viewMode !== 'gantt' || !isDragging || !newTaskPreview) return;
+    
+    const newTask: Task = {
+      id: Date.now().toString(),
+      title: 'New Task',
+      description: '',
+      startDate: newTaskPreview.startDate < newTaskPreview.endDate ? newTaskPreview.startDate : newTaskPreview.endDate,
+      endDate: newTaskPreview.startDate < newTaskPreview.endDate ? newTaskPreview.endDate : newTaskPreview.startDate,
+      color: '#6b7280',
+      milestones: [],
+      status: 'To Do'
+    };
+    setTasks(prev => [...prev, newTask]);
+    setSelectedTask(newTask);
+    setIsEditModalOpen(true);
+    
     setIsDragging(false);
     setNewTaskPreview(null);
   };
@@ -251,12 +258,108 @@ export const GanttChart: React.FC = () => {
     }
   };
 
+  if (viewMode === 'kanban') {
+    return (
+      <div className="h-screen flex flex-col bg-background">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-border bg-card rounded-b-xl">
+          <h1 className="text-2xl font-bold">Study Kanban Board</h1>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+              <Button
+                onClick={() => setViewMode('gantt')}
+                variant={viewMode === 'gantt' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-md"
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Gantt
+              </Button>
+              <Button
+                onClick={() => setViewMode('kanban')}
+                variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-md"
+              >
+                <Kanban className="w-4 h-4 mr-2" />
+                Kanban
+              </Button>
+            </div>
+            <Button onClick={handleAddTask} size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Task
+            </Button>
+            <Button onClick={() => setIsSettingsOpen(true)} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+              <Settings className="w-4 h-4" />
+            </Button>
+            <Button onClick={toggleTheme} variant="outline" size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+              {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <KanbanView 
+          tasks={tasks} 
+          onTaskUpdate={handleTaskUpdate}
+          onTaskClick={handleTaskClick}
+        />
+
+        {/* Modals */}
+        <TaskEditModal
+          task={selectedTask}
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedTask(null);
+          }}
+          onSave={(updates) => {
+            if (selectedTask) {
+              handleTaskUpdate(selectedTask.id, updates);
+            }
+          }}
+          onDelete={(taskId) => {
+            setTasks(prev => prev.filter(task => task.id !== taskId));
+            setIsEditModalOpen(false);
+            setSelectedTask(null);
+          }}
+        />
+
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          dayColors={dayColors}
+          onDayColorsChange={setDayColors}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
       <div className="flex items-center justify-between p-6 border-b border-border bg-card rounded-b-xl">
         <h1 className="text-2xl font-bold">Study Gantt Chart</h1>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+            <Button
+              onClick={() => setViewMode('gantt')}
+              variant={viewMode === 'gantt' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-md"
+            >
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Gantt
+            </Button>
+            <Button
+              onClick={() => setViewMode('kanban')}
+              variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-md"
+            >
+              <Kanban className="w-4 h-4 mr-2" />
+              Kanban
+            </Button>
+          </div>
           <Button onClick={handleAddTask} size="sm" className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
             <Plus className="w-4 h-4 mr-2" />
             Add Task
@@ -286,11 +389,11 @@ export const GanttChart: React.FC = () => {
           <div className="flex-1 p-4">
             <h3 className="font-medium mb-3">Navigation</h3>
             <div className="flex gap-2">
-              <Button onClick={() => navigateDate('prev')} variant="outline" size="sm" className="rounded-xl flex-1 transition-all duration-500 hover:scale-105">
+              <Button onClick={() => navigateDate('prev')} variant="outline" size="sm" className="rounded-xl flex-1 transition-all duration-300 hover:scale-105">
                 <ChevronLeft className="w-4 h-4" />
                 Earlier
               </Button>
-              <Button onClick={() => navigateDate('next')} variant="outline" size="sm" className="rounded-xl flex-1 transition-all duration-500 hover:scale-105">
+              <Button onClick={() => navigateDate('next')} variant="outline" size="sm" className="rounded-xl flex-1 transition-all duration-300 hover:scale-105">
                 Later
                 <ChevronRight className="w-4 h-4" />
               </Button>
@@ -306,13 +409,13 @@ export const GanttChart: React.FC = () => {
             className="flex border-b border-border bg-muted/20 overflow-hidden rounded-t-xl"
             onScroll={(e) => handleScroll((e.target as HTMLDivElement).scrollLeft)}
           >
-            {Object.entries(monthGroups).map(([key, { month, year, count }]) => (
+            {Object.entries(monthGroups).map(([key, group]) => (
               <div 
                 key={key}
                 className="border-r border-border px-4 py-4 text-center font-semibold bg-muted/30 first:rounded-tl-xl"
-                style={{ minWidth: `${count * dayWidth}px` }}
+                style={{ minWidth: `${group.count * dayWidth}px` }}
               >
-                {month} {year}
+                {group.month} {group.year}
               </div>
             ))}
           </div>
@@ -392,7 +495,7 @@ export const GanttChart: React.FC = () => {
                 timeline={timeline}
                 yPosition={(task as any).rowIndex * 80 + 20}
                 dayWidth={dayWidth}
-                scrollOffset={0} // Tasks are now positioned absolutely and don't need scroll offset
+                scrollOffset={0}
                 onUpdate={(updates) => handleTaskUpdate(task.id, updates)}
                 onClick={() => handleTaskClick(task)}
               />

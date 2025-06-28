@@ -7,8 +7,15 @@ export interface Task {
   endDate: Date;
   color: string;
   milestones: string[];
+  status?: string;
 }
 
 export interface DayColors {
   [dayIndex: number]: string; // 0 = Sunday, 1 = Monday, etc.
+}
+
+export interface KanbanColumn {
+  id: string;
+  title: string;
+  taskIds: string[];
 }
