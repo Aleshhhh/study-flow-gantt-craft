@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -50,6 +51,8 @@ export const GanttChart: React.FC = () => {
   const [currentNavDate, setCurrentNavDate] = useState<Date>(new Date());
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [taskBeingMoved, setTaskBeingMoved] = useState<string | null>(null);
+  const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [isDragToCreate, setIsDragToCreate] = useState(false);
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
@@ -130,8 +133,11 @@ export const GanttChart: React.FC = () => {
   };
 
   const handleTaskClick = (task: Task) => {
-    setSelectedTask(task);
-    setIsEditModalOpen(true);
+    // Only open modal if we're not dragging and not in the middle of a drag operation
+    if (!taskBeingMoved && !isDragToCreate) {
+      setSelectedTask(task);
+      setIsEditModalOpen(true);
+    }
   };
 
   const handleAddTask = () => {
@@ -201,7 +207,7 @@ export const GanttChart: React.FC = () => {
     setTaskBeingMoved(null);
   };
 
-  // Fixed mouse event handlers for drag-to-add functionality
+  // Improved mouse event handlers for drag-to-add functionality
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button !== 0 || !chartRef.current || taskBeingMoved) return;
     
@@ -211,46 +217,63 @@ export const GanttChart: React.FC = () => {
       const rect = chartRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left + chartRef.current.scrollLeft;
       const y = e.clientY - rect.top;
+      
+      setDragStartPos({ x: e.clientX, y: e.clientY });
+      setIsDragToCreate(false);
+      
       const dayIndex = Math.floor(x / dayWidth);
       const date = timeline[dayIndex];
       
       if (date) {
-        setIsDragging(true);
         setNewTaskPreview({ startDate: date, endDate: date, x, y });
       }
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging || !newTaskPreview || !chartRef.current || taskBeingMoved) return;
+    if (!newTaskPreview || !chartRef.current || taskBeingMoved) return;
     
-    const rect = chartRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left + chartRef.current.scrollLeft;
-    const dayIndex = Math.floor(x / dayWidth);
-    const endDate = timeline[dayIndex] || newTaskPreview.endDate;
+    // Check if we've moved enough to consider this a drag operation
+    if (dragStartPos && !isDragToCreate) {
+      const deltaX = Math.abs(e.clientX - dragStartPos.x);
+      const deltaY = Math.abs(e.clientY - dragStartPos.y);
+      if (deltaX > 5 || deltaY > 5) {
+        setIsDragToCreate(true);
+        setIsDragging(true);
+      }
+    }
     
-    setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
+    if (isDragToCreate) {
+      const rect = chartRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left + chartRef.current.scrollLeft;
+      const dayIndex = Math.floor(x / dayWidth);
+      const endDate = timeline[dayIndex] || newTaskPreview.endDate;
+      
+      setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
+    }
   };
 
   const handleMouseUp = () => {
-    if (!isDragging || !newTaskPreview || taskBeingMoved) return;
-    
-    const newTask: Task = {
-      id: Date.now().toString(),
-      title: 'New Task',
-      description: '',
-      startDate: newTaskPreview.startDate < newTaskPreview.endDate ? newTaskPreview.startDate : newTaskPreview.endDate,
-      endDate: newTaskPreview.startDate < newTaskPreview.endDate ? newTaskPreview.endDate : newTaskPreview.startDate,
-      color: '#6b7280',
-      milestones: [],
-      status: 'To Do'
-    };
-    setTasks(prev => [...prev, newTask]);
-    setSelectedTask(newTask);
-    setIsEditModalOpen(true);
+    if (isDragToCreate && newTaskPreview && !taskBeingMoved) {
+      const newTask: Task = {
+        id: Date.now().toString(),
+        title: 'New Task',
+        description: '',
+        startDate: newTaskPreview.startDate < newTaskPreview.endDate ? newTaskPreview.startDate : newTaskPreview.endDate,
+        endDate: newTaskPreview.startDate < newTaskPreview.endDate ? newTaskPreview.endDate : newTaskPreview.startDate,
+        color: '#6b7280',
+        milestones: [],
+        status: 'To Do'
+      };
+      setTasks(prev => [...prev, newTask]);
+      setSelectedTask(newTask);
+      setIsEditModalOpen(true);
+    }
     
     setIsDragging(false);
     setNewTaskPreview(null);
+    setDragStartPos(null);
+    setIsDragToCreate(false);
   };
 
   if (viewMode === 'kanban') {
@@ -305,10 +328,10 @@ export const GanttChart: React.FC = () => {
           {/* Desktop Controls */}
           <div className="hidden sm:flex items-center gap-3">
             <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-              <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'ghost'} size="sm" className="rounded-md">
+              <Button onClick={() => setViewMode('gantt')} variant="default" size="sm" className="rounded-md">
                 <BarChart3 className="w-4 h-4 mr-2" /> Gantt
               </Button>
-              <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="rounded-md">
+              <Button onClick={() => setViewMode('kanban')} variant="ghost" size="sm" className="rounded-md">
                 <Kanban className="w-4 h-4 mr-2" /> Kanban
               </Button>
             </div>
@@ -408,8 +431,8 @@ export const GanttChart: React.FC = () => {
               ))}
 
               {/* New task preview */}
-              {newTaskPreview && !taskBeingMoved && (
-                <div className="absolute rounded-xl shadow-sm border border-dashed border-muted-foreground/50 bg-muted/30 pointer-events-none"
+              {newTaskPreview && isDragToCreate && !taskBeingMoved && (
+                <div className="absolute rounded-xl shadow-sm border border-dashed border-muted-foreground/50 bg-muted/30 pointer-events-none transition-all duration-150"
                   style={{
                     left: `${timeline.findIndex(d => d.toDateString() === newTaskPreview.startDate.toDateString()) * dayWidth}px`,
                     top: `${Math.floor((newTaskPreview.y) / 60) * 60 + 10}px`,

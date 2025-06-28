@@ -29,6 +29,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, startDate: new Date() });
+  const [hasInteracted, setHasInteracted] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
 
   // Calculate task position and width
@@ -62,6 +63,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
     if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('task-content')) {
       e.preventDefault();
       setIsDragging(true);
+      setHasInteracted(true);
       setDragStart({ x: e.clientX, startDate: new Date(task.startDate) });
       if (onDragStart) onDragStart();
     }
@@ -71,16 +73,19 @@ export const TaskBar: React.FC<TaskBarProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsResizingLeft(true);
+    setHasInteracted(true);
   };
 
   const handleRightResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsResizingRight(true);
+    setHasInteracted(true);
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    if (!isDragging && !isResizingLeft && !isResizingRight) {
+    // Only trigger click if we haven't interacted with drag/resize
+    if (!hasInteracted) {
       onClick();
     }
   };
@@ -130,6 +135,8 @@ export const TaskBar: React.FC<TaskBarProps> = ({
       setIsDragging(false);
       setIsResizingLeft(false);
       setIsResizingRight(false);
+      // Reset interaction flag after a brief delay to allow click events
+      setTimeout(() => setHasInteracted(false), 100);
     };
 
     if (isDragging || isResizingLeft || isResizingRight) {
@@ -149,8 +156,8 @@ export const TaskBar: React.FC<TaskBarProps> = ({
     <>
       <div
         ref={barRef}
-        className={`absolute rounded-xl shadow-sm border transition-all duration-150 ease-out cursor-pointer group ${
-          isInteracting ? 'shadow-lg z-10' : 'hover:shadow-md hover:scale-[1.01] z-[1]'
+        className={`absolute rounded-xl shadow-sm border transition-all duration-200 ease-out cursor-pointer group ${
+          isInteracting ? 'shadow-xl z-10 scale-[1.02]' : 'hover:shadow-md hover:scale-[1.01] z-[1]'
         }`}
         style={{
           left: `${left}px`,
@@ -160,8 +167,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
           backgroundColor: task.color,
           borderColor: task.color,
           color: getTextColor(task.color),
-          transform: isInteracting ? 'translateY(-1px) scale(1.01)' : undefined,
-          transition: isInteracting ? 'transform 0.1s ease-out, box-shadow 0.1s ease-out' : 'all 0.15s ease-out'
+          transform: isInteracting ? 'translateY(-2px)' : undefined,
         }}
         onMouseDown={handleMouseDown}
         onClick={handleClick}
@@ -169,7 +175,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
         <div className="task-content h-full px-4 py-2 flex items-center justify-between pointer-events-none">
           <div className="task-content flex items-center gap-2 flex-1 truncate">
             <button
-              className="pointer-events-auto opacity-70 hover:opacity-100 transition-all duration-150 hover:scale-110"
+              className="pointer-events-auto opacity-70 hover:opacity-100 transition-all duration-200 hover:scale-110"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsExpanded(!isExpanded);
@@ -188,13 +194,13 @@ export const TaskBar: React.FC<TaskBarProps> = ({
           
           {/* Left resize handle */}
           <div 
-            className="absolute left-0 top-0 w-2 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-all duration-150 pointer-events-auto rounded-l-xl hover:bg-opacity-30"
+            className="absolute left-0 top-0 w-3 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-auto rounded-l-xl hover:bg-opacity-40 hover:w-4"
             onMouseDown={handleLeftResizeMouseDown}
           />
           
           {/* Right resize handle */}
           <div 
-            className="absolute right-0 top-0 w-2 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-all duration-150 pointer-events-auto rounded-r-xl hover:bg-opacity-30"
+            className="absolute right-0 top-0 w-3 h-full bg-black bg-opacity-20 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-auto rounded-r-xl hover:bg-opacity-40 hover:w-4"
             onMouseDown={handleRightResizeMouseDown}
           />
         </div>
@@ -203,7 +209,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
       {/* Expanded description */}
       {isExpanded && task.description && (
         <div
-          className="absolute bg-card border border-border rounded-xl shadow-xl p-4 max-w-md z-20 transition-all duration-150 animate-in slide-in-from-top-2"
+          className="absolute bg-card border border-border rounded-xl shadow-xl p-4 max-w-md z-20 transition-all duration-200 animate-in slide-in-from-top-2"
           style={{
             left: `${left}px`,
             top: `${yPosition + 50}px`

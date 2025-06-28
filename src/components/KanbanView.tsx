@@ -46,9 +46,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
-  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
-  const [draggedOverColumnIndex, setDraggedOverColumnIndex] = useState<number | null>(null);
   const [draggedOverTask, setDraggedOverTask] = useState<string | null>(null);
+  const [isDraggingTask, setIsDraggingTask] = useState(false);
 
   // Group tasks by status
   const getTasksByStatus = (status: string) => {
@@ -66,13 +65,16 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     return Math.round((columnIndex / (totalColumns - 1)) * 100);
   };
 
-  const handleTaskDragStart = (taskId: string) => {
+  const handleTaskDragStart = (e: React.DragEvent, taskId: string) => {
+    e.stopPropagation();
     setDraggedTask(taskId);
+    setIsDraggingTask(true);
     if (onTaskDragStart) onTaskDragStart(taskId);
   };
 
   const handleTaskDragOver = (e: React.DragEvent, columnId?: string, taskId?: string) => {
     e.preventDefault();
+    e.stopPropagation();
     if (columnId) {
       setDraggedOverColumn(columnId);
     }
@@ -82,13 +84,15 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     }
   };
 
-  const handleTaskDragLeave = () => {
+  const handleTaskDragLeave = (e: React.DragEvent) => {
+    e.stopPropagation();
     setDraggedOverColumn(null);
     setDraggedOverTask(null);
   };
 
   const handleTaskDrop = (e: React.DragEvent, columnId?: string, targetTaskId?: string) => {
     e.preventDefault();
+    e.stopPropagation();
     
     if (draggedTask) {
       if (targetTaskId && draggedTask !== targetTaskId) {
@@ -118,35 +122,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     setDraggedTask(null);
     setDraggedOverColumn(null);
     setDraggedOverTask(null);
-  };
-
-  // Column drag handlers
-  const handleColumnDragStart = (columnId: string) => {
-    setDraggedColumn(columnId);
-  };
-
-  const handleColumnDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    setDraggedOverColumnIndex(index);
-  };
-
-  const handleColumnDragLeave = () => {
-    setDraggedOverColumnIndex(null);
-  };
-
-  const handleColumnDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault();
-    if (draggedColumn) {
-      const draggedColumnIndex = columns.findIndex(col => col.id === draggedColumn);
-      if (draggedColumnIndex !== -1 && draggedColumnIndex !== dropIndex) {
-        const newColumns = [...columns];
-        const [movedColumn] = newColumns.splice(draggedColumnIndex, 1);
-        newColumns.splice(dropIndex, 0, movedColumn);
-        setColumns(newColumns);
-      }
-    }
-    setDraggedColumn(null);
-    setDraggedOverColumnIndex(null);
+    setIsDraggingTask(false);
   };
 
   const addColumn = () => {
@@ -185,14 +161,17 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   };
 
   const handleTaskClick = (task: Task) => {
-    onTaskClick(task);
+    // Only trigger click if we're not in the middle of dragging
+    if (!isDraggingTask) {
+      onTaskClick(task);
+    }
   };
 
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
       <div className="flex items-center justify-between p-2 sm:p-6 border-b border-border bg-card">
-        <h1 className="text-base sm:text-2xl font-bold truncate">Study Gantt</h1>
+        <h1 className="text-base sm:text-2xl font-bold truncate">Kanban</h1>
         <div className="flex items-center gap-1 sm:gap-2">
           {/* Desktop Controls */}
           <div className="hidden sm:flex items-center gap-3">
@@ -265,34 +244,19 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             {columns.map((column, index) => {
               const columnTasks = getTasksByStatus(column.title);
               const isTaskDraggedOver = draggedOverColumn === column.id;
-              const isColumnDraggedOver = draggedOverColumnIndex === index;
               
               return (
                 <div
                   key={column.id}
-                  draggable
-                  onDragStart={() => handleColumnDragStart(column.id)}
-                  onDragOver={(e) => {
-                    handleTaskDragOver(e, column.id);
-                    handleColumnDragOver(e, index);
-                  }}
-                  onDragLeave={() => {
-                    handleTaskDragLeave();
-                    handleColumnDragLeave();
-                  }}
-                  onDrop={(e) => {
-                    handleTaskDrop(e, column.id);
-                    handleColumnDrop(e, index);
-                  }}
-                  className={`flex-shrink-0 w-80 sm:w-96 lg:flex-1 lg:min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-150 ease-out cursor-move ${
+                  onDragOver={(e) => handleTaskDragOver(e, column.id)}
+                  onDragLeave={handleTaskDragLeave}
+                  onDrop={(e) => handleTaskDrop(e, column.id)}
+                  className={`flex-shrink-0 w-80 sm:w-96 lg:flex-1 lg:min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-150 ease-out ${
                     isTaskDraggedOver ? 'border-primary bg-primary/5 scale-[1.01]' : ''
-                  } ${
-                    isColumnDraggedOver && draggedColumn ? 'border-orange-500 bg-orange-50 dark:bg-orange-950' : ''
                   }`}
                 >
                   <div className="p-3 sm:p-4 border-b border-border flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <GripVertical className="w-4 h-4 text-muted-foreground" />
                       <h3 className="font-semibold text-base sm:text-lg">{column.title}</h3>
                       <span className="bg-muted text-muted-foreground rounded-full px-2 py-1 text-xs font-medium">
                         {columnTasks.length}
@@ -321,15 +285,15 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           key={task.id}
                           data-task-id={task.id}
                           draggable
-                          onDragStart={() => handleTaskDragStart(task.id)}
+                          onDragStart={(e) => handleTaskDragStart(e, task.id)}
                           onDragOver={(e) => handleTaskDragOver(e, undefined, task.id)}
                           onDragLeave={handleTaskDragLeave}
                           onDrop={(e) => handleTaskDrop(e, undefined, task.id)}
                           onClick={() => handleTaskClick(task)}
-                          className={`p-3 sm:p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-150 ease-out hover:shadow-md hover:scale-[1.01] group active:scale-95 touch-manipulation ${
-                            isBeingDragged ? 'opacity-50 scale-95' : ''
+                          className={`p-3 sm:p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-200 ease-out hover:shadow-md group touch-manipulation ${
+                            isBeingDragged ? 'opacity-60 scale-95 rotate-2' : 'hover:scale-[1.02]'
                           } ${
-                            isDraggedOver ? 'border-primary border-2 scale-[1.01]' : ''
+                            isDraggedOver ? 'border-primary border-2 scale-[1.01] shadow-lg' : ''
                           }`}
                           style={{
                             backgroundColor: task.color,
@@ -339,7 +303,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         >
                           <div className="flex items-start justify-between mb-2">
                             <h4 className="font-medium text-sm sm:text-base leading-tight pr-2">{task.title}</h4>
-                            <GripVertical className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                            <GripVertical className="w-4 h-4 opacity-40 group-hover:opacity-80 transition-opacity flex-shrink-0" />
                           </div>
                           {task.description && (
                             <p className="text-xs sm:text-sm opacity-80 line-clamp-2 mb-3">
