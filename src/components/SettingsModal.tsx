@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -5,15 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import type { DayColors, Task } from '@/types/gantt';
+import type { DayColors, CustomColors } from '@/types/gantt';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   dayColors: DayColors;
   onDayColorsChange: (colors: DayColors) => void;
-  tasks?: Task[];
-  onTaskUpdate?: (taskId: string, updates: Partial<Task>) => void;
+  customColors?: CustomColors;
+  onCustomColorsChange?: (colors: CustomColors) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -21,21 +22,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   dayColors,
   onDayColorsChange,
-  tasks = [],
-  onTaskUpdate
+  customColors = { taskBackground: '#f5f5dc', taskText: '#000000', progressBar: '#3b82f6' },
+  onCustomColorsChange
 }) => {
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   
   const colorOptions = [
     '#ffffff', '#f9fafb', '#f3f4f6', '#e5e7eb', '#d1d5db',
     '#0f172a', '#020617', '#1e293b', '#334155', '#475569',
+    '#1a1a1a', '#262626', '#333333', '#404040', '#525252',
     '#fef3c7', '#fed7aa', '#fecaca', '#fbb6ce', '#ddd6fe',
     '#bfdbfe', '#a7f3d0', '#fde68a', '#c084fc', '#fb7185'
   ];
 
-  const [customColors, setCustomColors] = useState<{ [key: number]: string }>({});
+  const taskColorOptions = [
+    '#f5f5dc', '#ffffff', '#fef3c7', '#fed7aa', '#fecaca',
+    '#bfdbfe', '#a7f3d0', '#ddd6fe', '#c084fc', '#fb7185',
+    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'
+  ];
+
+  const [customColors_local, setCustomColors_local] = useState<{ [key: number]: string }>({});
   const [customTextColors, setCustomTextColors] = useState<{ [key: number]: string }>({});
-  const [taskColors, setTaskColors] = useState<{ [taskId: string]: { background?: string; text?: string; progressBar?: string } }>({});
+  const [customTaskColors, setCustomTaskColors] = useState({
+    background: customColors.taskBackground,
+    text: customColors.taskText,
+    progress: customColors.progressBar
+  });
 
   const handleColorChange = (dayIndex: number, color: string) => {
     onDayColorsChange({ ...dayColors, [dayIndex]: color });
@@ -43,7 +55,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleCustomColorChange = (dayIndex: number, color: string) => {
     if (color && /^#[0-9A-F]{6}$/i.test(color)) {
-      setCustomColors(prev => ({ ...prev, [dayIndex]: color }));
+      setCustomColors_local(prev => ({ ...prev, [dayIndex]: color }));
       handleColorChange(dayIndex, color);
     }
   };
@@ -54,37 +66,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handleTaskColorChange = (type: 'background' | 'text' | 'progress', color: string) => {
+    const newColors = { ...customTaskColors, [type]: color };
+    setCustomTaskColors(newColors);
+    
+    if (onCustomColorsChange) {
+      onCustomColorsChange({
+        taskBackground: newColors.background,
+        taskText: newColors.text,
+        progressBar: newColors.progress
+      });
+    }
+  };
+
   const applyCustomColor = (dayIndex: number) => {
-    const color = customColors[dayIndex];
+    const color = customColors_local[dayIndex];
     if (color) {
       handleColorChange(dayIndex, color);
     }
   };
 
-  const handleTaskColorChange = (taskId: string, colorType: 'background' | 'text' | 'progressBar', color: string) => {
-    setTaskColors(prev => ({
-      ...prev,
-      [taskId]: {
-        ...prev[taskId],
-        [colorType]: color
-      }
-    }));
-  };
-
-  const applyTaskColor = (taskId: string, colorType: 'background' | 'text' | 'progressBar') => {
-    const color = taskColors[taskId]?.[colorType];
-    if (color && onTaskUpdate) {
-      const updates: Partial<Task> = {};
-      if (colorType === 'background') updates.color = color;
-      if (colorType === 'text') updates.textColor = color;
-      if (colorType === 'progressBar') updates.progressBarColor = color;
-      onTaskUpdate(taskId, updates);
-    }
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Timeline Settings</DialogTitle>
         </DialogHeader>
@@ -141,21 +145,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <Input
                         type="text"
                         placeholder="#FFFFFF"
-                        value={customColors[index] || ''}
-                        onChange={(e) => setCustomColors(prev => ({ ...prev, [index]: e.target.value }))}
+                        value={customColors_local[index] || ''}
+                        onChange={(e) => setCustomColors_local(prev => ({ ...prev, [index]: e.target.value }))}
                         className="font-mono text-sm"
                         maxLength={7}
                       />
                       <div 
                         className="w-10 h-10 rounded border border-border flex-shrink-0"
-                        style={{ backgroundColor: customColors[index] || dayColors[index] }}
+                        style={{ backgroundColor: customColors_local[index] || dayColors[index] }}
                       />
                     </div>
                     <Button 
                       size="sm" 
                       variant="outline"
                       onClick={() => applyCustomColor(index)}
-                      disabled={!customColors[index] || !/^#[0-9A-F]{6}$/i.test(customColors[index])}
+                      disabled={!customColors_local[index] || !/^#[0-9A-F]{6}$/i.test(customColors_local[index])}
                       className="w-full"
                     >
                       Apply Background
@@ -177,7 +181,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div 
                         className="w-10 h-10 rounded border border-border flex-shrink-0 flex items-center justify-center text-xs font-bold"
                         style={{ 
-                          backgroundColor: customColors[index] || dayColors[index],
+                          backgroundColor: customColors_local[index] || dayColors[index],
                           color: customTextColors[index] || '#000000'
                         }}
                       >
@@ -204,160 +208,154 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
             ))}
-            
-            <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-              <h4 className="text-sm font-medium mb-2">Color Format Guide</h4>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>• Use hexadecimal format: #RRGGBB</p>
-                <p>• Example: #FF5733 (orange), #2563EB (blue), #000000 (black)</p>
-                <p>• Colors must be exactly 6 characters after the #</p>
-              </div>
-            </div>
           </TabsContent>
 
-          <TabsContent value="tasks" className="space-y-4">
+          <TabsContent value="tasks" className="space-y-6">
             <p className="text-sm text-muted-foreground">
-              Customize the colors for individual tasks including background, text, and progress bar colors.
+              Customize the colors for tasks and progress bars in the Kanban view.
             </p>
-            
-            {tasks.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>No tasks available to customize.</p>
-                <p className="text-xs mt-1">Create some tasks first to customize their colors.</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {tasks.map((task) => (
-                  <div key={task.id} className="p-4 border border-border rounded-lg space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">{task.title}</h4>
-                      <div 
-                        className="w-8 h-8 rounded border border-border flex-shrink-0"
-                        style={{ 
-                          backgroundColor: task.color,
-                          color: task.textColor || (task.color === '#ffffff' || task.color === '#f9fafb' ? '#000000' : '#ffffff')
-                        }}
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Background Color */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Background Color</Label>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {colorOptions.slice(0, 10).map(color => (
-                            <button
-                              key={color}
-                              className={`w-6 h-6 rounded border transition-all hover:scale-110 ${
-                                task.color === color ? 'ring-2 ring-primary' : 'border-border'
-                              }`}
-                              style={{ backgroundColor: color }}
-                              onClick={() => onTaskUpdate?.(task.id, { color })}
-                            />
-                          ))}
-                        </div>
-                        <div className="flex gap-2">
-                          <Input
-                            type="text"
-                            placeholder="#FFFFFF"
-                            value={taskColors[task.id]?.background || ''}
-                            onChange={(e) => handleTaskColorChange(task.id, 'background', e.target.value)}
-                            className="font-mono text-sm"
-                            maxLength={7}
-                          />
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => applyTaskColor(task.id, 'background')}
-                            disabled={!taskColors[task.id]?.background || !/^#[0-9A-F]{6}$/i.test(taskColors[task.id]?.background || '')}
-                          >
-                            Apply
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {/* Text Color */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Text Color</Label>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {['#000000', '#ffffff', '#374151', '#6b7280', '#ef4444', '#3b82f6', '#10b981', '#f59e0b'].map(color => (
-                            <button
-                              key={color}
-                              className={`w-6 h-6 rounded border transition-all hover:scale-110 ${
-                                task.textColor === color ? 'ring-2 ring-primary' : 'border-border'
-                              }`}
-                              style={{ backgroundColor: color }}
-                              onClick={() => onTaskUpdate?.(task.id, { textColor: color })}
-                            />
-                          ))}
-                        </div>
-                        <div className="flex gap-2">
-                          <Input
-                            type="text"
-                            placeholder="#000000"
-                            value={taskColors[task.id]?.text || ''}
-                            onChange={(e) => handleTaskColorChange(task.id, 'text', e.target.value)}
-                            className="font-mono text-sm"
-                            maxLength={7}
-                          />
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => applyTaskColor(task.id, 'text')}
-                            disabled={!taskColors[task.id]?.text || !/^#[0-9A-F]{6}$/i.test(taskColors[task.id]?.text || '')}
-                          >
-                            Apply
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {/* Progress Bar Color */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Progress Bar Color</Label>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16'].map(color => (
-                            <button
-                              key={color}
-                              className={`w-6 h-6 rounded border transition-all hover:scale-110 ${
-                                task.progressBarColor === color ? 'ring-2 ring-primary' : 'border-border'
-                              }`}
-                              style={{ backgroundColor: color }}
-                              onClick={() => onTaskUpdate?.(task.id, { progressBarColor: color })}
-                            />
-                          ))}
-                        </div>
-                        <div className="flex gap-2">
-                          <Input
-                            type="text"
-                            placeholder="#22C55E"
-                            value={taskColors[task.id]?.progressBar || ''}
-                            onChange={(e) => handleTaskColorChange(task.id, 'progressBar', e.target.value)}
-                            className="font-mono text-sm"
-                            maxLength={7}
-                          />
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => applyTaskColor(task.id, 'progressBar')}
-                            disabled={!taskColors[task.id]?.progressBar || !/^#[0-9A-F]{6}$/i.test(taskColors[task.id]?.progressBar || '')}
-                          >
-                            Apply
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div className="text-xs text-muted-foreground">
-                      Current: Background {task.color}
-                      {task.textColor && ` • Text ${task.textColor}`}
-                      {task.progressBarColor && ` • Progress ${task.progressBarColor}`}
-                    </div>
-                  </div>
+
+            {/* Task Background Color */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Task Background Color</Label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {taskColorOptions.map(color => (
+                  <button
+                    key={color}
+                    className={`w-8 h-8 rounded-md border-2 transition-all hover:scale-110 ${
+                      customTaskColors.background === color ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => handleTaskColorChange('background', color)}
+                    title={color}
+                  />
                 ))}
               </div>
-            )}
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="text"
+                  placeholder="#F5F5DC"
+                  value={customTaskColors.background}
+                  onChange={(e) => setCustomTaskColors(prev => ({ ...prev, background: e.target.value }))}
+                  className="font-mono text-sm max-w-32"
+                  maxLength={7}
+                />
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => handleTaskColorChange('background', customTaskColors.background)}
+                  disabled={!/^#[0-9A-F]{6}$/i.test(customTaskColors.background)}
+                >
+                  Apply
+                </Button>
+                <div 
+                  className="w-10 h-10 rounded border border-border"
+                  style={{ backgroundColor: customTaskColors.background }}
+                />
+              </div>
+            </div>
+
+            {/* Task Text Color */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Task Text Color</Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="text"
+                  placeholder="#000000"
+                  value={customTaskColors.text}
+                  onChange={(e) => setCustomTaskColors(prev => ({ ...prev, text: e.target.value }))}
+                  className="font-mono text-sm max-w-32"
+                  maxLength={7}
+                />
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => handleTaskColorChange('text', customTaskColors.text)}
+                  disabled={!/^#[0-9A-F]{6}$/i.test(customTaskColors.text)}
+                >
+                  Apply
+                </Button>
+                <div 
+                  className="w-10 h-10 rounded border border-border flex items-center justify-center text-xs font-bold"
+                  style={{ 
+                    backgroundColor: customTaskColors.background,
+                    color: customTaskColors.text
+                  }}
+                >
+                  Aa
+                </div>
+              </div>
+            </div>
+
+            {/* Progress Bar Color */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Progress Bar Color</Label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {taskColorOptions.map(color => (
+                  <button
+                    key={color}
+                    className={`w-8 h-8 rounded-md border-2 transition-all hover:scale-110 ${
+                      customTaskColors.progress === color ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => handleTaskColorChange('progress', color)}
+                    title={color}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="text"
+                  placeholder="#3B82F6"
+                  value={customTaskColors.progress}
+                  onChange={(e) => setCustomTaskColors(prev => ({ ...prev, progress: e.target.value }))}
+                  className="font-mono text-sm max-w-32"
+                  maxLength={7}
+                />
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => handleTaskColorChange('progress', customTaskColors.progress)}
+                  disabled={!/^#[0-9A-F]{6}$/i.test(customTaskColors.progress)}
+                >
+                  Apply
+                </Button>
+                <div 
+                  className="w-10 h-10 rounded border border-border overflow-hidden"
+                  style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+                >
+                  <div 
+                    className="h-full transition-all"
+                    style={{ 
+                      backgroundColor: customTaskColors.progress,
+                      width: '70%'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+              <h4 className="text-sm font-medium mb-2">Preview</h4>
+              <div 
+                className="p-3 rounded-lg shadow-sm border"
+                style={{
+                  backgroundColor: customTaskColors.background,
+                  color: customTaskColors.text
+                }}
+              >
+                <div className="font-medium mb-2">Sample Task</div>
+                <div className="h-2 bg-black/20 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full transition-all"
+                    style={{ 
+                      backgroundColor: customTaskColors.progress,
+                      width: '60%'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>

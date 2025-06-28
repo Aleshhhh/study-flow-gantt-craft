@@ -6,8 +6,6 @@ export interface Task {
   startDate: Date;
   endDate: Date;
   color: string;
-  textColor?: string;
-  progressBarColor?: string;
   milestones: string[];
   status?: string;
 }
@@ -20,4 +18,10 @@ export interface KanbanColumn {
   id: string;
   title: string;
   taskIds: string[];
+}
+
+export interface CustomColors {
+  taskBackground: string;
+  taskText: string;
+  progressBar: string;
 }
