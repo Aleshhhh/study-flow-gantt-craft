@@ -31,7 +31,7 @@ export const GanttChart: React.FC = () => {
       description: 'Complete chapter 1 review and practice problems. This involves reading through all the material, taking notes, and working through the exercises at the end of the chapter.',
       startDate: new Date(2025, 5, 15),
       endDate: new Date(2025, 5, 20),
-      color: '#6b7280',
+      color: '#f5f5dc',
       milestones: ['Review notes', 'Practice problems'],
       status: 'To Do'
     }
@@ -42,8 +42,13 @@ export const GanttChart: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [dayColors, setDayColors] = useState<DayColors>({
-    0: '#f3f4f6', 1: '#ffffff', 2: '#ffffff', 3: '#ffffff',
-    4: '#ffffff', 5: '#ffffff', 6: '#f9fafb'
+    0: theme === 'dark' ? '#1f2937' : '#f3f4f6', 
+    1: theme === 'dark' ? '#111827' : '#ffffff', 
+    2: theme === 'dark' ? '#111827' : '#ffffff', 
+    3: theme === 'dark' ? '#111827' : '#ffffff',
+    4: theme === 'dark' ? '#111827' : '#ffffff', 
+    5: theme === 'dark' ? '#111827' : '#ffffff', 
+    6: theme === 'dark' ? '#1f2937' : '#f9fafb'
   });
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(new Date());
@@ -54,6 +59,7 @@ export const GanttChart: React.FC = () => {
   // --- STATE E REFS PER LA TIMELINE INFINITA ---
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [savedScrollPositions, setSavedScrollPositions] = useState<{ [key in ViewMode]?: number }>({});
   const lastNavDirection = useRef<'prev' | 'next' | null>(null);
 
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -66,14 +72,41 @@ export const GanttChart: React.FC = () => {
   const bufferDays = 30;
   const daysToNavigate = 30;
 
-  // Reset states when switching to Gantt view
+  // Update day colors when theme changes
+  useEffect(() => {
+    setDayColors({
+      0: theme === 'dark' ? '#1f2937' : '#f3f4f6', 
+      1: theme === 'dark' ? '#111827' : '#ffffff', 
+      2: theme === 'dark' ? '#111827' : '#ffffff', 
+      3: theme === 'dark' ? '#111827' : '#ffffff',
+      4: theme === 'dark' ? '#111827' : '#ffffff', 
+      5: theme === 'dark' ? '#111827' : '#ffffff', 
+      6: theme === 'dark' ? '#1f2937' : '#f9fafb'
+    });
+  }, [theme]);
+
+  // Reset states when switching to Gantt view and restore scroll position
   useEffect(() => {
     if (viewMode === 'gantt') {
       setIsDragging(false);
       setIsTaskBeingDragged(false);
       setNewTaskPreview(null);
+      
+      // Restore scroll position after a short delay to ensure DOM is ready
+      setTimeout(() => {
+        if (savedScrollPositions.gantt !== undefined && chartRef.current) {
+          chartRef.current.scrollLeft = savedScrollPositions.gantt;
+          setScrollOffset(savedScrollPositions.gantt);
+        }
+      }, 50);
+    } else {
+      // Save current scroll position when leaving Gantt view
+      setSavedScrollPositions(prev => ({
+        ...prev,
+        gantt: scrollOffset
+      }));
     }
-  }, [viewMode]);
+  }, [viewMode, savedScrollPositions.gantt, scrollOffset]);
 
   // --- LOGICA DI GENERAZIONE TIMELINE ---
   const generateDynamicTimeline = useCallback(() => {
@@ -89,7 +122,7 @@ export const GanttChart: React.FC = () => {
       timeline.push(date);
     }
     return timeline;
-  }, [currentDate]);
+  }, [currentDate, visibleDays, bufferDays]);
 
   const timeline = generateDynamicTimeline();
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -103,6 +136,13 @@ export const GanttChart: React.FC = () => {
     acc[monthKey].count++;
     return acc;
   }, {});
+
+  // Get current visible month based on scroll position
+  const getCurrentVisibleMonth = () => {
+    const currentDayIndex = Math.floor(scrollOffset / dayWidth);
+    const currentVisibleDate = timeline[currentDayIndex] || timeline[0];
+    return `${monthNames[currentVisibleDate.getMonth()]} ${currentVisibleDate.getFullYear()}`;
+  };
 
   // --- LOGICA DI GESTIONE TASK ---
   const arrangeTasksInRows = () => {
@@ -138,7 +178,7 @@ export const GanttChart: React.FC = () => {
       id: Date.now().toString(), title: 'New Task', description: '',
       startDate: centerDate,
       endDate: new Date(centerDate.getTime() + 5 * 24 * 60 * 60 * 1000),
-      color: '#6b7280', milestones: [], status: 'To Do'
+      color: '#f5f5dc', milestones: [], status: 'To Do'
     };
     setTasks(prev => [...prev, newTask]);
     setSelectedTask(newTask);
@@ -155,7 +195,7 @@ export const GanttChart: React.FC = () => {
       newDate.setDate(newDate.getDate() + (direction === 'next' ? daysToNavigate : -daysToNavigate));
       return newDate;
     });
-  }, [isLoading]);
+  }, [isLoading, daysToNavigate]);
 
   const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (viewMode === 'gantt') {
@@ -182,7 +222,7 @@ export const GanttChart: React.FC = () => {
         navigateDate('prev');
       }
     }
-  }, [scrollOffset, isLoading, navigateDate, viewMode]);
+  }, [scrollOffset, isLoading, navigateDate, viewMode, dayWidth]);
 
   useLayoutEffect(() => {
     if (viewMode !== 'gantt' || !isLoading) return;
@@ -199,7 +239,7 @@ export const GanttChart: React.FC = () => {
     }
     setIsLoading(false);
     lastNavDirection.current = null;
-  }, [timeline, isLoading, viewMode]);
+  }, [timeline, isLoading, viewMode, daysToNavigate, dayWidth]);
 
   useEffect(() => {
     if (viewMode !== 'gantt') return;
@@ -256,7 +296,7 @@ export const GanttChart: React.FC = () => {
       id: Date.now().toString(), title: 'New Task', description: '',
       startDate: startDate < endDate ? startDate : endDate,
       endDate: startDate < endDate ? endDate : startDate,
-      color: '#6b7280', milestones: [], status: 'To Do'
+      color: '#f5f5dc', milestones: [], status: 'To Do'
     };
     setTasks(prev => [...prev, newTask]);
     setSelectedTask(newTask);
@@ -349,7 +389,14 @@ export const GanttChart: React.FC = () => {
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
       <div className="flex items-center justify-between p-2 sm:p-6 border-b border-border bg-card">
-         <h1 className="text-base sm:text-2xl font-bold truncate">Study Gantt</h1>
+         <div className="flex items-center gap-4">
+           <h1 className="text-base sm:text-2xl font-bold truncate">Study Gantt</h1>
+           {viewMode === 'gantt' && (
+             <div className="text-sm text-muted-foreground font-medium">
+               {getCurrentVisibleMonth()}
+             </div>
+           )}
+         </div>
          <div className="flex items-center gap-1 sm:gap-2">
             {/* Controlli Mobile */}
              <div className="sm:hidden">
@@ -430,7 +477,7 @@ export const GanttChart: React.FC = () => {
               return (
                 <div key={index} className={`relative border-r border-border p-1 sm:p-4 text-center text-xs sm:text-sm transition-colors duration-200 ${isSelectedDate ? 'bg-primary/20' : ''}`}
                      style={{ 
-                       backgroundColor: isSelectedDate ? undefined : (theme === 'dark' ? (dayColors[date.getDay()] === '#ffffff' ? '#1f2937' : '#374151') : dayColors[date.getDay()]),
+                       backgroundColor: isSelectedDate ? undefined : dayColors[date.getDay()],
                        minWidth: `${dayWidth}px` 
                      }}>
                   {isMonthStart && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary/30 rounded-full" />}
