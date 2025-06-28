@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -184,14 +185,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   };
 
   const handleTaskClick = (task: Task) => {
-    // Add visual feedback for click
-    const taskElement = document.querySelector(`[data-task-id="${task.id}"]`);
-    if (taskElement) {
-      taskElement.classList.add('animate-pulse');
-      setTimeout(() => {
-        taskElement.classList.remove('animate-pulse');
-      }, 200);
-    }
     onTaskClick(task);
   };
 
@@ -291,8 +284,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                     handleTaskDrop(e, column.id);
                     handleColumnDrop(e, index);
                   }}
-                  className={`flex-shrink-0 w-80 sm:w-96 lg:flex-1 lg:min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-200 ease-out cursor-move ${
-                    isTaskDraggedOver ? 'border-primary bg-primary/5 scale-[1.02]' : ''
+                  className={`flex-shrink-0 w-80 sm:w-96 lg:flex-1 lg:min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-150 ease-out cursor-move ${
+                    isTaskDraggedOver ? 'border-primary bg-primary/5 scale-[1.01]' : ''
                   } ${
                     isColumnDraggedOver && draggedColumn ? 'border-orange-500 bg-orange-50 dark:bg-orange-950' : ''
                   }`}
@@ -333,10 +326,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           onDragLeave={handleTaskDragLeave}
                           onDrop={(e) => handleTaskDrop(e, undefined, task.id)}
                           onClick={() => handleTaskClick(task)}
-                          className={`p-3 sm:p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-200 ease-out hover:shadow-md hover:scale-[1.02] group active:scale-95 touch-manipulation ${
+                          className={`p-3 sm:p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-150 ease-out hover:shadow-md hover:scale-[1.01] group active:scale-95 touch-manipulation ${
                             isBeingDragged ? 'opacity-50 scale-95' : ''
                           } ${
-                            isDraggedOver ? 'border-primary border-2 scale-[1.02]' : ''
+                            isDraggedOver ? 'border-primary border-2 scale-[1.01]' : ''
                           }`}
                           style={{
                             backgroundColor: task.color,
