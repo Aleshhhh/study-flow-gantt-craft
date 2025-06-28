@@ -25,6 +25,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
+  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+  const [draggedOverColumnIndex, setDraggedOverColumnIndex] = useState<number | null>(null);
 
   // Group tasks by status
   const getTasksByStatus = (status: string) => {
@@ -42,20 +44,20 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     return Math.round((columnIndex / (totalColumns - 1)) * 100);
   };
 
-  const handleDragStart = (taskId: string) => {
+  const handleTaskDragStart = (taskId: string) => {
     setDraggedTask(taskId);
   };
 
-  const handleDragOver = (e: React.DragEvent, columnId: string) => {
+  const handleTaskDragOver = (e: React.DragEvent, columnId: string) => {
     e.preventDefault();
     setDraggedOverColumn(columnId);
   };
 
-  const handleDragLeave = () => {
+  const handleTaskDragLeave = () => {
     setDraggedOverColumn(null);
   };
 
-  const handleDrop = (e: React.DragEvent, columnId: string) => {
+  const handleTaskDrop = (e: React.DragEvent, columnId: string) => {
     e.preventDefault();
     if (draggedTask) {
       const column = columns.find(col => col.id === columnId);
@@ -65,6 +67,35 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     }
     setDraggedTask(null);
     setDraggedOverColumn(null);
+  };
+
+  const handleColumnDragStart = (e: React.DragEvent, columnId: string) => {
+    setDraggedColumn(columnId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleColumnDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDraggedOverColumnIndex(index);
+  };
+
+  const handleColumnDragLeave = () => {
+    setDraggedOverColumnIndex(null);
+  };
+
+  const handleColumnDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedColumn) {
+      const draggedColumnIndex = columns.findIndex(col => col.id === draggedColumn);
+      if (draggedColumnIndex !== -1 && draggedColumnIndex !== dropIndex) {
+        const newColumns = [...columns];
+        const [draggedCol] = newColumns.splice(draggedColumnIndex, 1);
+        newColumns.splice(dropIndex, 0, draggedCol);
+        setColumns(newColumns);
+      }
+    }
+    setDraggedColumn(null);
+    setDraggedOverColumnIndex(null);
   };
 
   const addColumn = () => {
@@ -108,22 +139,37 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full">
         {/* Mobile: Horizontal scroll, Desktop: Normal flex */}
         <div className="flex lg:contents gap-4 lg:gap-6 overflow-x-auto lg:overflow-x-visible pb-4 lg:pb-0">
-          {columns.map((column) => {
+          {columns.map((column, index) => {
             const columnTasks = getTasksByStatus(column.title);
             const isDraggedOver = draggedOverColumn === column.id;
+            const isColumnDraggedOver = draggedOverColumnIndex === index;
             
             return (
               <div
                 key={column.id}
                 className={`flex-shrink-0 w-80 sm:w-96 lg:flex-1 lg:min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-300 ${
                   isDraggedOver ? 'border-primary bg-primary/5 scale-102' : ''
-                }`}
-                onDragOver={(e) => handleDragOver(e, column.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, column.id)}
+                } ${isColumnDraggedOver ? 'border-blue-500 bg-blue-50' : ''}`}
+                onDragOver={(e) => {
+                  handleTaskDragOver(e, column.id);
+                  handleColumnDragOver(e, index);
+                }}
+                onDragLeave={() => {
+                  handleTaskDragLeave();
+                  handleColumnDragLeave();
+                }}
+                onDrop={(e) => {
+                  handleTaskDrop(e, column.id);
+                  handleColumnDrop(e, index);
+                }}
               >
-                <div className="p-3 sm:p-4 border-b border-border flex items-center justify-between">
+                <div 
+                  className="p-3 sm:p-4 border-b border-border flex items-center justify-between cursor-move"
+                  draggable
+                  onDragStart={(e) => handleColumnDragStart(e, column.id)}
+                >
                   <div className="flex items-center gap-2">
+                    <GripVertical className="w-4 h-4 text-muted-foreground" />
                     <h3 className="font-semibold text-base sm:text-lg">{column.title}</h3>
                     <span className="bg-muted text-muted-foreground rounded-full px-2 py-1 text-xs font-medium">
                       {columnTasks.length}
@@ -149,13 +195,13 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                       <div
                         key={task.id}
                         draggable
-                        onDragStart={() => handleDragStart(task.id)}
+                        onDragStart={() => handleTaskDragStart(task.id)}
                         onClick={() => onTaskClick(task)}
                         className="p-3 sm:p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md hover:scale-102 group active:scale-95 touch-manipulation"
                         style={{
                           backgroundColor: task.color,
                           borderColor: task.color,
-                          color: getTextColor(task.color)
+                          color: task.textColor || getTextColor(task.color)
                         }}
                       >
                         <div className="flex items-start justify-between mb-2">
@@ -174,13 +220,15 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                             <span className="text-xs opacity-70">Progress</span>
                             <span className="text-xs opacity-70">{progress}%</span>
                           </div>
-                          <Progress 
-                            value={progress} 
-                            className="h-2 bg-black/20"
-                            style={{
-                              backgroundColor: 'rgba(0,0,0,0.2)'
-                            }}
-                          />
+                          <div className="w-full bg-black/20 rounded-full h-2 overflow-hidden">
+                            <div 
+                              className="h-full rounded-full transition-all"
+                              style={{ 
+                                backgroundColor: task.progressBarColor || '#3b82f6',
+                                width: `${progress}%`
+                              }}
+                            />
+                          </div>
                         </div>
                         
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs opacity-70 gap-1 sm:gap-0">
