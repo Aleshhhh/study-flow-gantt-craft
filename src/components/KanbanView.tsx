@@ -1,21 +1,22 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Plus, GripVertical, Trash2 } from 'lucide-react';
-import type { Task, KanbanColumn } from '@/types/gantt';
+import type { Task, KanbanColumn, CustomColors } from '@/types/gantt';
 
 interface KanbanViewProps {
   tasks: Task[];
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
   onTaskClick: (task: Task) => void;
+  customColors?: CustomColors;
 }
 
 export const KanbanView: React.FC<KanbanViewProps> = ({
   tasks,
   onTaskUpdate,
-  onTaskClick
+  onTaskClick,
+  customColors = { taskBackground: '#f5f5dc', taskText: '#000000', progressBar: '#3b82f6' }
 }) => {
   const [columns, setColumns] = useState<KanbanColumn[]>([
     { id: 'todo', title: 'To Do', taskIds: [] },
@@ -93,16 +94,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
     }
   };
 
-  const getTextColor = (backgroundColor: string) => {
-    const hex = backgroundColor.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    return luminance > 0.5 ? '#000000' : '#ffffff';
-  };
-
   return (
     <div className="flex-1 p-3 sm:p-6 overflow-auto">
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full">
@@ -153,14 +144,17 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         onClick={() => onTaskClick(task)}
                         className="p-3 sm:p-4 rounded-xl shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md hover:scale-102 group active:scale-95 touch-manipulation"
                         style={{
-                          backgroundColor: task.color,
-                          borderColor: task.color,
-                          color: getTextColor(task.color)
+                          backgroundColor: customColors.taskBackground,
+                          borderColor: customColors.taskBackground,
+                          color: customColors.taskText
                         }}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="font-medium text-sm sm:text-base leading-tight pr-2">{task.title}</h4>
-                          <GripVertical className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                          <GripVertical 
+                            className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity flex-shrink-0" 
+                            style={{ color: customColors.taskText }}
+                          />
                         </div>
                         {task.description && (
                           <p className="text-xs sm:text-sm opacity-80 line-clamp-2 mb-3">
@@ -168,19 +162,21 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                           </p>
                         )}
                         
-                        {/* Progress Bar */}
+                        {/* Custom Progress Bar */}
                         <div className="mb-3">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs opacity-70">Progress</span>
                             <span className="text-xs opacity-70">{progress}%</span>
                           </div>
-                          <Progress 
-                            value={progress} 
-                            className="h-2 bg-black/20"
-                            style={{
-                              backgroundColor: 'rgba(0,0,0,0.2)'
-                            }}
-                          />
+                          <div className="h-2 bg-black/20 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full transition-all"
+                              style={{ 
+                                backgroundColor: customColors.progressBar,
+                                width: `${progress}%`
+                              }}
+                            />
+                          </div>
                         </div>
                         
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs opacity-70 gap-1 sm:gap-0">

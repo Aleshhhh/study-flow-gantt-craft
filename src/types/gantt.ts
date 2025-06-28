@@ -19,3 +19,9 @@ export interface KanbanColumn {
   title: string;
   taskIds: string[];
 }
+
+export interface CustomColors {
+  taskBackground: string;
+  taskText: string;
+  progressBar: string;
+}
