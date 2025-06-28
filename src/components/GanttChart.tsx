@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -7,9 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar as CalendarIcon } from "lucide-react"
 import { DateRange } from "react-day-picker"
-import { CalendarIcon } from '@radix-ui/react-icons';
 import type { Task, DayColors } from '@/types/gantt';
 import { KanbanView } from './KanbanView';
 
