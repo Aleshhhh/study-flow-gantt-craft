@@ -75,7 +75,7 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
   };
 
   const handleDelete = () => {
-    if (task) {
+    if (task && confirm('Are you sure you want to delete this task?')) {
       onDelete(task.id);
     }
   };
