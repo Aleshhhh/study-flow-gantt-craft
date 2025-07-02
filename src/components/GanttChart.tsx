@@ -19,38 +19,87 @@ interface MonthGroup {
 }
 type ViewMode = 'gantt' | 'kanban';
 
+// Storage utility functions
+const STORAGE_KEYS = {
+  TASKS: 'gantt-tasks',
+  DAY_COLORS: 'gantt-day-colors',
+  CURRENT_DATE: 'gantt-current-date',
+  VIEW_MODE: 'gantt-view-mode'
+};
+
+const saveToStorage = (key: string, data: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.error('Failed to save to localStorage:', error);
+  }
+};
+
+const loadFromStorage = (key: string, defaultValue: any) => {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : defaultValue;
+  } catch (error) {
+    console.error('Failed to load from localStorage:', error);
+    return defaultValue;
+  }
+};
+
 // --- COMPONENTE GANTT CHART MODIFICATO ---
 export const GanttChart: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
-  const [viewMode, setViewMode] = useState<ViewMode>('gantt');
   
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: '1',
-      title: 'Sample Study Task',
-      description: 'Complete chapter 1 review and practice problems. This involves reading through all the material, taking notes, and working through the exercises at the end of the chapter.',
-      startDate: new Date(2025, 5, 15),
-      endDate: new Date(2025, 5, 20),
-      color: '#f5f5dc',
-      milestones: ['Review notes', 'Practice problems'],
-      status: 'To Do'
+  // Load initial data from localStorage
+  const [viewMode, setViewMode] = useState<ViewMode>(() => 
+    loadFromStorage(STORAGE_KEYS.VIEW_MODE, 'gantt')
+  );
+  
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    const savedTasks = loadFromStorage(STORAGE_KEYS.TASKS, []);
+    if (savedTasks.length === 0) {
+      return [{
+        id: '1',
+        title: 'Sample Study Task',
+        description: 'Complete chapter 1 review and practice problems. This involves reading through all the material, taking notes, and working through the exercises at the end of the chapter.',
+        startDate: new Date(2025, 5, 15),
+        endDate: new Date(2025, 5, 20),
+        color: '#f5f5dc',
+        milestones: ['Review notes', 'Practice problems'],
+        status: 'To Do'
+      }];
     }
-  ]);
+    
+    // Convert date strings back to Date objects
+    return savedTasks.map((task: any) => ({
+      ...task,
+      startDate: new Date(task.startDate),
+      endDate: new Date(task.endDate)
+    }));
+  });
   
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [dayColors, setDayColors] = useState<DayColors>({
-    0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
-    1: theme === 'dark' ? '#020617' : '#ffffff', 
-    2: theme === 'dark' ? '#020617' : '#ffffff', 
-    3: theme === 'dark' ? '#020617' : '#ffffff',
-    4: theme === 'dark' ? '#020617' : '#ffffff', 
-    5: theme === 'dark' ? '#020617' : '#ffffff', 
-    6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
+  
+  const [dayColors, setDayColors] = useState<DayColors>(() => {
+    const savedColors = loadFromStorage(STORAGE_KEYS.DAY_COLORS, null);
+    return savedColors || {
+      0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
+      1: theme === 'dark' ? '#020617' : '#ffffff', 
+      2: theme === 'dark' ? '#020617' : '#ffffff', 
+      3: theme === 'dark' ? '#020617' : '#ffffff',
+      4: theme === 'dark' ? '#020617' : '#ffffff', 
+      5: theme === 'dark' ? '#020617' : '#ffffff', 
+      6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
+    };
   });
-  const [currentDate, setCurrentDate] = useState(new Date());
+  
+  const [currentDate, setCurrentDate] = useState(() => {
+    const savedDate = loadFromStorage(STORAGE_KEYS.CURRENT_DATE, null);
+    return savedDate ? new Date(savedDate) : new Date();
+  });
+  
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(new Date());
   const [isDragging, setIsDragging] = useState(false);
   const [isTaskBeingDragged, setIsTaskBeingDragged] = useState(false);
@@ -72,9 +121,26 @@ export const GanttChart: React.FC = () => {
   const bufferDays = 30;
   const daysToNavigate = 30;
 
+  // Save data to localStorage whenever it changes
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.TASKS, tasks);
+  }, [tasks]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.DAY_COLORS, dayColors);
+  }, [dayColors]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.CURRENT_DATE, currentDate);
+  }, [currentDate]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.VIEW_MODE, viewMode);
+  }, [viewMode]);
+
   // Update day colors when theme changes
   useEffect(() => {
-    setDayColors({
+    const newColors = {
       0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
       1: theme === 'dark' ? '#020617' : '#ffffff', 
       2: theme === 'dark' ? '#020617' : '#ffffff', 
@@ -82,7 +148,8 @@ export const GanttChart: React.FC = () => {
       4: theme === 'dark' ? '#020617' : '#ffffff', 
       5: theme === 'dark' ? '#020617' : '#ffffff', 
       6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
-    });
+    };
+    setDayColors(newColors);
   }, [theme]);
 
   // Reset states when switching to Gantt view and restore scroll position
