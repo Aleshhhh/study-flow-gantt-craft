@@ -7,7 +7,7 @@ import { TaskBar } from './TaskBar';
 import { TaskEditModal } from './TaskEditModal';
 import { SettingsModal } from './SettingsModal';
 import { useTheme } from './ThemeProvider';
-import { Moon, Sun, Settings, Plus, BarChart3, Kanban, Calendar as CalendarIcon, Menu } from 'lucide-react';
+import { Moon, Sun, Settings, Plus, BarChart3, Kanban, Calendar as CalendarIcon, Menu, List } from 'lucide-react';
 import type { Task, DayColors } from '@/types/gantt';
 import { KanbanView } from './KanbanView';
 
@@ -24,7 +24,8 @@ const STORAGE_KEYS = {
   TASKS: 'gantt-tasks',
   DAY_COLORS: 'gantt-day-colors',
   CURRENT_DATE: 'gantt-current-date',
-  VIEW_MODE: 'gantt-view-mode'
+  VIEW_MODE: 'gantt-view-mode',
+  SCROLL_POSITION: 'gantt-scroll-position'
 };
 
 const saveToStorage = (key: string, data: any) => {
@@ -81,6 +82,7 @@ export const GanttChart: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isTaskListOpen, setIsTaskListOpen] = useState(false);
   
   const [dayColors, setDayColors] = useState<DayColors>(() => {
     const savedColors = loadFromStorage(STORAGE_KEYS.DAY_COLORS, null);
@@ -107,7 +109,9 @@ export const GanttChart: React.FC = () => {
   const [newTaskPreview, setNewTaskPreview] = useState<{ startDate: Date; endDate: Date; x: number; y: number } | null>(null);
   
   // --- STATE E REFS PER LA TIMELINE INFINITA ---
-  const [scrollOffset, setScrollOffset] = useState(0);
+  const [scrollOffset, setScrollOffset] = useState(() => 
+    loadFromStorage(STORAGE_KEYS.SCROLL_POSITION, 0)
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [savedScrollPositions, setSavedScrollPositions] = useState<{ [key in ViewMode]?: number }>({});
   const lastNavDirection = useRef<'prev' | 'next' | null>(null);
@@ -139,6 +143,10 @@ export const GanttChart: React.FC = () => {
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.VIEW_MODE, viewMode);
   }, [viewMode]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.SCROLL_POSITION, scrollOffset);
+  }, [scrollOffset]);
 
   // Update day colors when theme changes only if no custom colors are saved
   useEffect(() => {
@@ -172,12 +180,13 @@ export const GanttChart: React.FC = () => {
       
       // Restore scroll position after a short delay to ensure DOM is ready
       setTimeout(() => {
-        if (savedScrollPositions.gantt !== undefined && chartRef.current) {
-          chartRef.current.scrollLeft = savedScrollPositions.gantt;
-          setScrollOffset(savedScrollPositions.gantt);
+        const savedScrollPos = savedScrollPositions.gantt !== undefined ? savedScrollPositions.gantt : scrollOffset;
+        if (chartRef.current) {
+          chartRef.current.scrollLeft = savedScrollPos;
+          setScrollOffset(savedScrollPos);
         }
       }, 50);
-    } else if (viewMode === 'kanban') {
+    } else {
       // Save current scroll position when leaving Gantt view
       setSavedScrollPositions(prev => ({
         ...prev,
@@ -232,6 +241,20 @@ export const GanttChart: React.FC = () => {
     const currentDayIndex = Math.floor(scrollOffset / dayWidth);
     const currentVisibleDate = timeline[currentDayIndex] || timeline[0];
     return `${monthNames[currentVisibleDate.getMonth()]} ${currentVisibleDate.getFullYear()}`;
+  };
+
+  // Navigate to task function
+  const navigateToTask = (task: Task) => {
+    const taskStartIndex = timeline.findIndex(date => 
+      date.toDateString() === task.startDate.toDateString()
+    );
+    
+    if (taskStartIndex !== -1 && chartRef.current) {
+      const targetScrollLeft = Math.max(0, taskStartIndex * dayWidth - (chartRef.current.clientWidth / 2));
+      chartRef.current.scrollLeft = targetScrollLeft;
+      setScrollOffset(targetScrollLeft);
+      setIsTaskListOpen(false);
+    }
   };
 
   // --- LOGICA DI GESTIONE TASK ---
@@ -506,6 +529,9 @@ export const GanttChart: React.FC = () => {
                                      <Kanban className="w-4 h-4 mr-2" />Kanban
                                  </Button>
                              </div>
+                             <Button onClick={() => setIsTaskListOpen(true)} variant="outline" className="w-full justify-start">
+                                 <List className="w-4 h-4 mr-2" />Task List
+                             </Button>
                              <Button onClick={() => setIsCalendarOpen(true)} variant="outline" className="w-full justify-start">
                                  <CalendarIcon className="w-4 h-4 mr-2" />Calendar
                              </Button>
@@ -529,6 +555,45 @@ export const GanttChart: React.FC = () => {
                     <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'ghost'} size="sm" className="rounded-md"><BarChart3 className="w-4 h-4 mr-2" />Gantt</Button>
                     <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="rounded-md"><Kanban className="w-4 h-4 mr-2" />Kanban</Button>
                  </div>
+                 <Sheet open={isTaskListOpen} onOpenChange={setIsTaskListOpen}>
+                     <SheetTrigger asChild>
+                         <Button variant="outline" size="sm" className="rounded-xl shadow-sm"><List className="w-4 h-4 mr-2" />Tasks</Button>
+                     </SheetTrigger>
+                     <SheetContent side="left" className="w-80">
+                         <SheetHeader>
+                             <SheetTitle>Task List</SheetTitle>
+                         </SheetHeader>
+                         <div className="mt-6 space-y-2 max-h-[calc(100vh-120px)] overflow-y-auto">
+                             {tasks.length === 0 ? (
+                                 <p className="text-muted-foreground text-center py-8">No tasks yet. Create your first task!</p>
+                             ) : (
+                                 tasks.map((task) => (
+                                     <div
+                                         key={task.id}
+                                         className="p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                                         onClick={() => navigateToTask(task)}
+                                     >
+                                         <div className="flex items-center gap-3">
+                                             <div 
+                                                 className="w-3 h-3 rounded-full flex-shrink-0"
+                                                 style={{ backgroundColor: task.color }}
+                                             />
+                                             <div className="flex-1 min-w-0">
+                                                 <h4 className="font-medium truncate">{task.title}</h4>
+                                                 <p className="text-sm text-muted-foreground">
+                                                     {task.startDate.toLocaleDateString()} - {task.endDate.toLocaleDateString()}
+                                                 </p>
+                                                 <span className="text-xs px-2 py-1 bg-muted rounded-full">
+                                                     {task.status}
+                                                 </span>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 ))
+                             )}
+                         </div>
+                     </SheetContent>
+                 </Sheet>
                  <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                      <SheetTrigger asChild>
                          <Button variant="outline" size="sm" className="rounded-xl shadow-sm"><CalendarIcon className="w-4 h-4" /></Button>
