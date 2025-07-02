@@ -1,0 +1,23 @@
+
+version: '3.8'
+services:
+  study-flow-gantt:
+    build: .
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    container_name: study-flow-gantt
+    environment:
+      - NODE_ENV=production
+    volumes:
+      # Optional: Mount a volume for persistent data if needed
+      - gantt_data:/app/data
+    networks:
+      - gantt_network
+
+volumes:
+  gantt_data:
+
+networks:
+  gantt_network:
+    driver: bridge

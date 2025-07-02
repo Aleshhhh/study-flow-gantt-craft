@@ -1,0 +1,18 @@
+
+version: '3.8'
+services:
+  study-flow-gantt:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    container_name: study-flow-gantt
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - gantt_network
+
+networks:
+  gantt_network:
+    driver: bridge

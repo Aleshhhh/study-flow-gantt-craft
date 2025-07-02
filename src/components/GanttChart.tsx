@@ -84,6 +84,7 @@ export const GanttChart: React.FC = () => {
   
   const [dayColors, setDayColors] = useState<DayColors>(() => {
     const savedColors = loadFromStorage(STORAGE_KEYS.DAY_COLORS, null);
+    console.log('Loading day colors from localStorage:', savedColors);
     return savedColors || {
       0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
       1: theme === 'dark' ? '#020617' : '#ffffff', 
@@ -127,6 +128,7 @@ export const GanttChart: React.FC = () => {
   }, [tasks]);
 
   useEffect(() => {
+    console.log('Saving day colors to localStorage:', dayColors);
     saveToStorage(STORAGE_KEYS.DAY_COLORS, dayColors);
   }, [dayColors]);
 
@@ -138,19 +140,28 @@ export const GanttChart: React.FC = () => {
     saveToStorage(STORAGE_KEYS.VIEW_MODE, viewMode);
   }, [viewMode]);
 
-  // Update day colors when theme changes
+  // Update day colors when theme changes only if no custom colors are saved
   useEffect(() => {
-    const newColors = {
-      0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
-      1: theme === 'dark' ? '#020617' : '#ffffff', 
-      2: theme === 'dark' ? '#020617' : '#ffffff', 
-      3: theme === 'dark' ? '#020617' : '#ffffff',
-      4: theme === 'dark' ? '#020617' : '#ffffff', 
-      5: theme === 'dark' ? '#020617' : '#ffffff', 
-      6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
-    };
-    setDayColors(newColors);
+    const savedColors = loadFromStorage(STORAGE_KEYS.DAY_COLORS, null);
+    if (!savedColors) {
+      const newColors = {
+        0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
+        1: theme === 'dark' ? '#020617' : '#ffffff', 
+        2: theme === 'dark' ? '#020617' : '#ffffff', 
+        3: theme === 'dark' ? '#020617' : '#ffffff',
+        4: theme === 'dark' ? '#020617' : '#ffffff', 
+        5: theme === 'dark' ? '#020617' : '#ffffff', 
+        6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
+      };
+      setDayColors(newColors);
+    }
   }, [theme]);
+
+  // Handle dayColors changes from SettingsModal
+  const handleDayColorsChange = (newColors: DayColors) => {
+    console.log('Day colors changed:', newColors);
+    setDayColors(newColors);
+  };
 
   // Reset states when switching to Gantt view and restore scroll position
   useEffect(() => {
@@ -460,7 +471,7 @@ export const GanttChart: React.FC = () => {
             <KanbanView tasks={tasks} onTaskUpdate={handleTaskUpdate} onTaskClick={handleTaskClick} />
             {/* Modals */}
             <TaskEditModal task={selectedTask} isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setSelectedTask(null); }} onSave={(updates) => { if (selectedTask) handleTaskUpdate(selectedTask.id, updates); }} onDelete={(taskId) => { setTasks(prev => prev.filter(task => task.id !== taskId)); setIsEditModalOpen(false); setSelectedTask(null); }} />
-            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} dayColors={dayColors} onDayColorsChange={setDayColors} />
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} dayColors={dayColors} onDayColorsChange={handleDayColorsChange} />
         </div>
     );
   }
@@ -626,7 +637,7 @@ export const GanttChart: React.FC = () => {
         onClose={() => { setIsEditModalOpen(false); setSelectedTask(null); }}
         onSave={(updates) => { if (selectedTask) handleTaskUpdate(selectedTask.id, updates); }}
         onDelete={(taskId) => { setTasks(prev => prev.filter(task => task.id !== taskId)); setIsEditModalOpen(false); setSelectedTask(null); }} />
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} dayColors={dayColors} onDayColorsChange={setDayColors} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} dayColors={dayColors} onDayColorsChange={handleDayColorsChange} />
     </div>
   );
 };
