@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -44,24 +45,13 @@ const loadFromStorage = (key: string, defaultValue: any) => {
   }
 };
 
-// Default day colors function
-const getDefaultDayColors = (theme: string): DayColors => ({
-  0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
-  1: theme === 'dark' ? '#020617' : '#ffffff', 
-  2: theme === 'dark' ? '#020617' : '#ffffff', 
-  3: theme === 'dark' ? '#020617' : '#ffffff',
-  4: theme === 'dark' ? '#020617' : '#ffffff', 
-  5: theme === 'dark' ? '#020617' : '#ffffff', 
-  6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
-});
-
 // --- COMPONENTE GANTT CHART MODIFICATO ---
 export const GanttChart: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   
   // Load initial data from localStorage
   const [viewMode, setViewMode] = useState<ViewMode>(() => 
-    loadFromStorage(STORAGE_KEYS.VIEW_MODE, 'gantt') as ViewMode
+    loadFromStorage(STORAGE_KEYS.VIEW_MODE, 'gantt')
   );
   
   const [tasks, setTasks] = useState<Task[]>(() => {
@@ -94,7 +84,15 @@ export const GanttChart: React.FC = () => {
   
   const [dayColors, setDayColors] = useState<DayColors>(() => {
     const savedColors = loadFromStorage(STORAGE_KEYS.DAY_COLORS, null);
-    return savedColors || getDefaultDayColors(theme);
+    return savedColors || {
+      0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
+      1: theme === 'dark' ? '#020617' : '#ffffff', 
+      2: theme === 'dark' ? '#020617' : '#ffffff', 
+      3: theme === 'dark' ? '#020617' : '#ffffff',
+      4: theme === 'dark' ? '#020617' : '#ffffff', 
+      5: theme === 'dark' ? '#020617' : '#ffffff', 
+      6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
+    };
   });
   
   const [currentDate, setCurrentDate] = useState(() => {
@@ -129,7 +127,6 @@ export const GanttChart: React.FC = () => {
   }, [tasks]);
 
   useEffect(() => {
-    console.log('Saving day colors to localStorage:', dayColors);
     saveToStorage(STORAGE_KEYS.DAY_COLORS, dayColors);
   }, [dayColors]);
 
@@ -141,11 +138,19 @@ export const GanttChart: React.FC = () => {
     saveToStorage(STORAGE_KEYS.VIEW_MODE, viewMode);
   }, [viewMode]);
 
-  // Handle day colors changes from settings modal
-  const handleDayColorsChange = (newColors: DayColors) => {
-    console.log('Day colors changed:', newColors);
+  // Update day colors when theme changes
+  useEffect(() => {
+    const newColors = {
+      0: theme === 'dark' ? '#0f172a' : '#f8fafc', 
+      1: theme === 'dark' ? '#020617' : '#ffffff', 
+      2: theme === 'dark' ? '#020617' : '#ffffff', 
+      3: theme === 'dark' ? '#020617' : '#ffffff',
+      4: theme === 'dark' ? '#020617' : '#ffffff', 
+      5: theme === 'dark' ? '#020617' : '#ffffff', 
+      6: theme === 'dark' ? '#0f172a' : '#f1f5f9'
+    };
     setDayColors(newColors);
-  };
+  }, [theme]);
 
   // Reset states when switching to Gantt view and restore scroll position
   useEffect(() => {
@@ -168,7 +173,7 @@ export const GanttChart: React.FC = () => {
         gantt: scrollOffset
       }));
     }
-  }, [viewMode, savedScrollPositions.gantt, scrollOffset]);
+  }, [viewMode]);
 
   // Save scroll position when leaving Gantt view
   useEffect(() => {
@@ -455,7 +460,7 @@ export const GanttChart: React.FC = () => {
             <KanbanView tasks={tasks} onTaskUpdate={handleTaskUpdate} onTaskClick={handleTaskClick} />
             {/* Modals */}
             <TaskEditModal task={selectedTask} isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setSelectedTask(null); }} onSave={(updates) => { if (selectedTask) handleTaskUpdate(selectedTask.id, updates); }} onDelete={(taskId) => { setTasks(prev => prev.filter(task => task.id !== taskId)); setIsEditModalOpen(false); setSelectedTask(null); }} />
-            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} dayColors={dayColors} onDayColorsChange={handleDayColorsChange} />
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} dayColors={dayColors} onDayColorsChange={setDayColors} />
         </div>
     );
   }
@@ -621,7 +626,7 @@ export const GanttChart: React.FC = () => {
         onClose={() => { setIsEditModalOpen(false); setSelectedTask(null); }}
         onSave={(updates) => { if (selectedTask) handleTaskUpdate(selectedTask.id, updates); }}
         onDelete={(taskId) => { setTasks(prev => prev.filter(task => task.id !== taskId)); setIsEditModalOpen(false); setSelectedTask(null); }} />
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} dayColors={dayColors} onDayColorsChange={handleDayColorsChange} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} dayColors={dayColors} onDayColorsChange={setDayColors} />
     </div>
   );
 };
