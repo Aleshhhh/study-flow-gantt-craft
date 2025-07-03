@@ -447,12 +447,12 @@ export const GanttChart: React.FC = () => {
                              </SheetHeader>
                              <div className="space-y-4 mt-6">
                                  <div className="flex flex-col gap-2">
-                                     <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'outline'} className="w-full justify-start">
-                                         <BarChart3 className="w-4 h-4 mr-2" />Gantt
-                                     </Button>
-                                     <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'outline'} className="w-full justify-start">
-                                         <Kanban className="w-4 h-4 mr-2" />Kanban
-                                     </Button>
+                                      <Button onClick={() => setViewMode('gantt')} variant={viewMode === ('gantt' as ViewMode) ? 'default' : 'outline'} className="w-full justify-start">
+                                          <BarChart3 className="w-4 h-4 mr-2" />Gantt
+                                      </Button>
+                                      <Button onClick={() => setViewMode('kanban')} variant={viewMode === ('kanban' as ViewMode) ? 'default' : 'outline'} className="w-full justify-start">
+                                          <Kanban className="w-4 h-4 mr-2" />Kanban
+                                      </Button>
                                  </div>
                                  <Button onClick={() => setIsCalendarOpen(true)} variant="outline" className="w-full justify-start">
                                      <CalendarIcon className="w-4 h-4 mr-2" />Calendar
@@ -474,8 +474,8 @@ export const GanttChart: React.FC = () => {
                 {/* Controlli Desktop */}
                  <div className="hidden sm:flex items-center gap-3">
                      <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-                        <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'ghost'} size="sm" className="rounded-md"><BarChart3 className="w-4 h-4 mr-2" />Gantt</Button>
-                        <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="rounded-md"><Kanban className="w-4 h-4 mr-2" />Kanban</Button>
+                         <Button onClick={() => setViewMode('gantt')} variant={viewMode === ('gantt' as ViewMode) ? 'default' : 'ghost'} size="sm" className="rounded-md"><BarChart3 className="w-4 h-4 mr-2" />Gantt</Button>
+                         <Button onClick={() => setViewMode('kanban')} variant={viewMode === ('kanban' as ViewMode) ? 'default' : 'ghost'} size="sm" className="rounded-md"><Kanban className="w-4 h-4 mr-2" />Kanban</Button>
                      </div>
                      <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                          <SheetTrigger asChild>
@@ -522,12 +522,12 @@ export const GanttChart: React.FC = () => {
                          </SheetHeader>
                          <div className="space-y-4 mt-6">
                              <div className="flex flex-col gap-2">
-                                 <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'outline'} className="w-full justify-start">
-                                     <BarChart3 className="w-4 h-4 mr-2" />Gantt
-                                 </Button>
-                                 <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'outline'} className="w-full justify-start">
-                                     <Kanban className="w-4 h-4 mr-2" />Kanban
-                                 </Button>
+                                  <Button onClick={() => setViewMode('gantt')} variant={viewMode === ('gantt' as ViewMode) ? 'default' : 'outline'} className="w-full justify-start">
+                                      <BarChart3 className="w-4 h-4 mr-2" />Gantt
+                                  </Button>
+                                  <Button onClick={() => setViewMode('kanban')} variant={viewMode === ('kanban' as ViewMode) ? 'default' : 'outline'} className="w-full justify-start">
+                                      <Kanban className="w-4 h-4 mr-2" />Kanban
+                                  </Button>
                              </div>
                              <Button onClick={() => setIsTaskListOpen(true)} variant="outline" className="w-full justify-start">
                                  <List className="w-4 h-4 mr-2" />Task List
@@ -552,8 +552,8 @@ export const GanttChart: React.FC = () => {
             {/* Controlli Desktop */}
              <div className="hidden sm:flex items-center gap-3">
                  <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-                    <Button onClick={() => setViewMode('gantt')} variant={viewMode === 'gantt' ? 'default' : 'ghost'} size="sm" className="rounded-md"><BarChart3 className="w-4 h-4 mr-2" />Gantt</Button>
-                    <Button onClick={() => setViewMode('kanban')} variant={viewMode === 'kanban' ? 'default' : 'ghost'} size="sm" className="rounded-md"><Kanban className="w-4 h-4 mr-2" />Kanban</Button>
+                     <Button onClick={() => setViewMode('gantt')} variant={viewMode === ('gantt' as ViewMode) ? 'default' : 'ghost'} size="sm" className="rounded-md"><BarChart3 className="w-4 h-4 mr-2" />Gantt</Button>
+                     <Button onClick={() => setViewMode('kanban')} variant={viewMode === ('kanban' as ViewMode) ? 'default' : 'ghost'} size="sm" className="rounded-md"><Kanban className="w-4 h-4 mr-2" />Kanban</Button>
                  </div>
                  <Sheet open={isTaskListOpen} onOpenChange={setIsTaskListOpen}>
                      <SheetTrigger asChild>
