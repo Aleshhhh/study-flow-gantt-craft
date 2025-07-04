@@ -440,12 +440,19 @@ export const GanttChart: React.FC = () => {
       const x = touch.clientX - rect.left + scrollOffset;
       const y = touch.clientY - rect.top;
       
+      console.log('Touch start - setting up long press timer');
       setTouchStartTime(Date.now());
       setTouchStartPos({ x: touch.clientX, y: touch.clientY });
       setIsLongPress(false);
       
+      // Clear any existing timer
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+      }
+      
       // Set long press timer
       const timer = setTimeout(() => {
+        console.log('Long press activated - starting task creation');
         setIsLongPress(true);
         // Start task creation preview
         const dayIndex = Math.floor(x / dayWidth);
@@ -472,8 +479,11 @@ export const GanttChart: React.FC = () => {
     
     if (!chartEl || !touchStartPos) return;
     
+    console.log('Touch move - isLongPress:', isLongPress, 'isDragging:', isDragging, 'hasPreview:', !!newTaskPreview);
+    
     // Check if this is a long press drag for task creation
     if (isLongPress && isDragging && newTaskPreview && !isTaskBeingDragged) {
+      console.log('Preventing scroll - in task creation mode');
       e.preventDefault(); // Prevent scrolling during task creation
       e.stopPropagation();
       const rect = chartEl.getBoundingClientRect();
@@ -481,19 +491,23 @@ export const GanttChart: React.FC = () => {
       const dayIndex = Math.max(0, Math.floor(x / dayWidth));
       const endDate = timeline[dayIndex] ? new Date(timeline[dayIndex]) : new Date(newTaskPreview.endDate);
       setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
-    } else {
-      // Check if user moved too much (cancel long press) - but allow for normal scrolling
-      const deltaX = Math.abs(touch.clientX - touchStartPos.x);
-      const deltaY = Math.abs(touch.clientY - touchStartPos.y);
-      
-      // Only cancel long press if significant movement occurs before long press is established
-      if ((deltaX > 15 || deltaY > 15) && !isLongPress) {
-        if (longPressTimer) {
-          clearTimeout(longPressTimer);
-          setLongPressTimer(null);
-        }
-        setIsLongPress(false);
+      return; // Important: return here to prevent further processing
+    } 
+    
+    // Check if user moved too much (cancel long press) - but allow for normal scrolling
+    const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+    const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+    
+    console.log('Movement delta:', { deltaX, deltaY }, 'isLongPress:', isLongPress);
+    
+    // Only cancel long press if significant movement occurs before long press is established
+    if ((deltaX > 15 || deltaY > 15) && !isLongPress) {
+      console.log('Canceling long press due to movement');
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        setLongPressTimer(null);
       }
+      setIsLongPress(false);
     }
   };
 
@@ -754,7 +768,11 @@ export const GanttChart: React.FC = () => {
 
           {/* Tasks Timeline */}
           <div ref={chartRef} className="flex-1 overflow-auto relative bg-background"
-               style={{ minHeight: '200px', cursor: isDragging ? 'crosshair' : 'default' }}
+               style={{ 
+                 minHeight: '200px', 
+                 cursor: isDragging ? 'crosshair' : 'default',
+                 touchAction: (touchStartPos && !isLongPress) ? 'pan-x' : isLongPress && isDragging ? 'none' : 'auto'
+               }}
                onScroll={handleMainScroll}
                onMouseDown={handleMouseDown}
                onMouseMove={handleMouseMove}
@@ -762,7 +780,8 @@ export const GanttChart: React.FC = () => {
                onMouseLeave={handleMouseUp}
                onTouchStart={handleTouchStart}
                onTouchMove={handleTouchMove}
-               onTouchEnd={handleTouchEnd}>
+               onTouchEnd={handleTouchEnd}
+               onTouchCancel={handleTouchEnd}>
             
             <div className="relative w-full h-full">
                  {/* Vertical Grid Lines */}
