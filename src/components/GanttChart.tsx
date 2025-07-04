@@ -453,6 +453,10 @@ export const GanttChart: React.FC = () => {
         if (date) {
           setIsDragging(true);
           setNewTaskPreview({ startDate: new Date(date), endDate: new Date(date), x, y });
+          // Haptic feedback if available
+          if ('vibrate' in navigator) {
+            navigator.vibrate(50);
+          }
         }
       }, 500); // 500ms for long press
       
@@ -466,21 +470,24 @@ export const GanttChart: React.FC = () => {
     const touch = e.touches[0];
     const chartEl = chartRef.current;
     
-    if (!chartEl) return;
+    if (!chartEl || !touchStartPos) return;
     
     // Check if this is a long press drag for task creation
     if (isLongPress && isDragging && newTaskPreview && !isTaskBeingDragged) {
       e.preventDefault(); // Prevent scrolling during task creation
+      e.stopPropagation();
       const rect = chartEl.getBoundingClientRect();
       const x = touch.clientX - rect.left + scrollOffset;
       const dayIndex = Math.max(0, Math.floor(x / dayWidth));
       const endDate = timeline[dayIndex] ? new Date(timeline[dayIndex]) : new Date(newTaskPreview.endDate);
       setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
-    } else if (touchStartPos) {
-      // Check if user moved too much (cancel long press)
+    } else {
+      // Check if user moved too much (cancel long press) - but allow for normal scrolling
       const deltaX = Math.abs(touch.clientX - touchStartPos.x);
       const deltaY = Math.abs(touch.clientY - touchStartPos.y);
-      if (deltaX > 10 || deltaY > 10) {
+      
+      // Only cancel long press if significant movement occurs before long press is established
+      if ((deltaX > 15 || deltaY > 15) && !isLongPress) {
         if (longPressTimer) {
           clearTimeout(longPressTimer);
           setLongPressTimer(null);
