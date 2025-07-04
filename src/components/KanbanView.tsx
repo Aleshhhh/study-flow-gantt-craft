@@ -135,10 +135,10 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   };
 
   return (
-    <div className="flex-1 p-3 sm:p-6 overflow-auto">
-      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full">
-        {/* Mobile: Horizontal scroll, Desktop: Normal flex */}
-        <div className="flex lg:contents gap-4 lg:gap-6 overflow-x-auto lg:overflow-x-visible pb-4 lg:pb-0">
+    <div className="flex-1 p-2 sm:p-6 overflow-auto">
+      <div className="flex flex-col lg:flex-row gap-3 lg:gap-6 h-full">
+        {/* Mobile: Horizontal scroll with snap, Desktop: Normal flex */}
+        <div className="flex lg:contents gap-3 lg:gap-6 overflow-x-auto lg:overflow-x-visible pb-4 lg:pb-0 snap-x snap-mandatory lg:snap-none scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
           {columns.map((column, index) => {
             const columnTasks = getTasksByStatus(column.title);
             const isDraggedOver = draggedOverColumn === column.id;
@@ -147,7 +147,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
             return (
               <div
                 key={column.id}
-                className={`flex-shrink-0 w-80 sm:w-96 lg:flex-1 lg:min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-300 ${
+                className={`flex-shrink-0 w-72 sm:w-80 md:w-96 lg:flex-1 lg:min-w-80 bg-card rounded-xl shadow-sm border transition-all duration-300 snap-center lg:snap-align-none ${
                   isDraggedOver ? 'border-primary bg-primary/5 scale-102' : ''
                 } ${isColumnDraggedOver ? 'border-blue-500 bg-blue-50' : ''}`}
                 onDragOver={(e) => {
@@ -249,7 +249,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         </div>
         
         {/* Add Column */}
-        <div className="flex-shrink-0 w-80 sm:w-96 lg:w-80 bg-card rounded-xl shadow-sm border border-dashed border-muted-foreground/30">
+        <div className="flex-shrink-0 w-72 sm:w-80 md:w-96 lg:w-80 bg-card rounded-xl shadow-sm border border-dashed border-muted-foreground/30 snap-center lg:snap-align-none">
           <div className="p-3 sm:p-4">
             <div className="space-y-3">
               <Input

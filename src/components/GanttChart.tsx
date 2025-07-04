@@ -108,6 +108,12 @@ export const GanttChart: React.FC = () => {
   const [isTaskBeingDragged, setIsTaskBeingDragged] = useState(false);
   const [newTaskPreview, setNewTaskPreview] = useState<{ startDate: Date; endDate: Date; x: number; y: number } | null>(null);
   
+  // Mobile touch states
+  const [touchStartTime, setTouchStartTime] = useState<number>(0);
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [isLongPress, setIsLongPress] = useState(false);
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  
   // --- STATE E REFS PER LA TIMELINE INFINITA ---
   const [scrollOffset, setScrollOffset] = useState(() => 
     loadFromStorage(STORAGE_KEYS.SCROLL_POSITION, 0)
@@ -419,6 +425,103 @@ export const GanttChart: React.FC = () => {
     setNewTaskPreview(null);
   };
 
+  // --- MOBILE TOUCH HANDLERS ---
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (viewMode !== 'gantt' || isTaskBeingDragged) return;
+    
+    const target = e.target as HTMLElement;
+    if (target.closest('.task-bar')) return;
+
+    const touch = e.touches[0];
+    const chartEl = chartRef.current;
+    
+    if (chartEl && chartEl.contains(target)) {
+      const rect = chartEl.getBoundingClientRect();
+      const x = touch.clientX - rect.left + scrollOffset;
+      const y = touch.clientY - rect.top;
+      
+      setTouchStartTime(Date.now());
+      setTouchStartPos({ x: touch.clientX, y: touch.clientY });
+      setIsLongPress(false);
+      
+      // Set long press timer
+      const timer = setTimeout(() => {
+        setIsLongPress(true);
+        // Start task creation preview
+        const dayIndex = Math.floor(x / dayWidth);
+        const date = timeline[dayIndex];
+        if (date) {
+          setIsDragging(true);
+          setNewTaskPreview({ startDate: new Date(date), endDate: new Date(date), x, y });
+        }
+      }, 500); // 500ms for long press
+      
+      setLongPressTimer(timer);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (viewMode !== 'gantt') return;
+    
+    const touch = e.touches[0];
+    const chartEl = chartRef.current;
+    
+    if (!chartEl) return;
+    
+    // Check if this is a long press drag for task creation
+    if (isLongPress && isDragging && newTaskPreview && !isTaskBeingDragged) {
+      e.preventDefault(); // Prevent scrolling during task creation
+      const rect = chartEl.getBoundingClientRect();
+      const x = touch.clientX - rect.left + scrollOffset;
+      const dayIndex = Math.max(0, Math.floor(x / dayWidth));
+      const endDate = timeline[dayIndex] ? new Date(timeline[dayIndex]) : new Date(newTaskPreview.endDate);
+      setNewTaskPreview(prev => prev ? { ...prev, endDate } : null);
+    } else if (touchStartPos) {
+      // Check if user moved too much (cancel long press)
+      const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+      const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+      if (deltaX > 10 || deltaY > 10) {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          setLongPressTimer(null);
+        }
+        setIsLongPress(false);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    
+    if (viewMode !== 'gantt') return;
+    
+    // Complete task creation if it was a long press drag
+    if (isLongPress && isDragging && newTaskPreview && !isTaskBeingDragged) {
+      const { startDate, endDate } = newTaskPreview;
+      if (startDate.getTime() !== endDate.getTime()) {
+        const newTask: Task = {
+          id: Date.now().toString(), title: 'New Task', description: '',
+          startDate: startDate < endDate ? new Date(startDate) : new Date(endDate),
+          endDate: startDate < endDate ? new Date(endDate) : new Date(startDate),
+          color: '#f5f5dc', milestones: [], status: 'To Do'
+        };
+        setTasks(prev => [...prev, newTask]);
+        setSelectedTask(newTask);
+        setIsEditModalOpen(true);
+      }
+    }
+    
+    // Reset all touch states
+    setIsDragging(false);
+    setNewTaskPreview(null);
+    setIsLongPress(false);
+    setTouchStartTime(0);
+    setTouchStartPos(null);
+  };
+
   const handleCalendarDateSelect = (date: Date | undefined) => {
     setSelectedCalendarDate(date);
     if (date) {
@@ -649,7 +752,10 @@ export const GanttChart: React.FC = () => {
                onMouseDown={handleMouseDown}
                onMouseMove={handleMouseMove}
                onMouseUp={handleMouseUp}
-               onMouseLeave={handleMouseUp}>
+               onMouseLeave={handleMouseUp}
+               onTouchStart={handleTouchStart}
+               onTouchMove={handleTouchMove}
+               onTouchEnd={handleTouchEnd}>
             
             <div className="relative w-full h-full">
                  {/* Vertical Grid Lines */}
